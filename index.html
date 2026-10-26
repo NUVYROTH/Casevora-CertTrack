@@ -126,7 +126,6 @@ function addDays(ymd,n){ const [y,m,d]=ymd.split('-').map(Number); const t=new D
 function addMonths(ymd,n){ const [y,m,d]=ymd.split('-').map(Number); const t=new Date(y,m-1+n,1); const last=new Date(t.getFullYear(),t.getMonth()+1,0).getDate(); return t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(Math.min(d,last)); }
 function daysBetween(a,b){ const [y1,m1,d1]=a.split('-').map(Number), [y2,m2,d2]=b.split('-').map(Number); return Math.round((new Date(y2,m2-1,d2)-new Date(y1,m1-1,d1))/86400000); }
 function fmtDate(s){ if(!s) return ''; const [y,m,d]=s.split('-'); return `${y}/${m}/${d}`; }
-const isUrl = s => /^https?:\/\/\S+$/i.test(String(s||'').trim());
 function flash(t){
   const d = document.createElement('div'); d.textContent = t;
   d.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1f6f5c;color:#fff;padding:8px 20px;border-radius:6px;z-index:99;box-shadow:0 2px 8px rgba(0,0,0,.2)';
@@ -254,7 +253,7 @@ function showHome(){
           <li>COA、原物料外檢報告、儀器校正外檢報告分成三個清單，點上面的按鈕進入。</li>
           <li>先「新增紀錄」建立應收文件清單；還沒收到文件時，收件日期留空，狀態會顯示「缺件」。</li>
           <li>收到文件後，修改該筆、填上收件日期，「應提供或更新日期」會自動帶出預設值（可自行修改），並由品管人員判定品質確認狀態。</li>
-          <li>每筆紀錄可以加入圖片或 PDF 附件（單檔 20 MB 以內），點縮圖可以打開查看；也可以在「檔案位置」寫資料夾路徑或貼雲端硬碟連結。</li>
+          <li>每筆紀錄可以加入圖片或 PDF 附件（單檔 20 MB 以內），點縮圖可以打開查看。</li>
           <li>文件收件狀態由日期自動判斷：缺件＝沒有收件日期；需要更新＝進入到期前提示期或品質不合格；尚未更新＝已過到期日；已更新＝其餘。</li>
           <li>預設更新週期與提示期：COA 一年、到期前 3 個月；原物料外檢報告 4 個月、到期前 1 個月；儀器校正外檢報告 一年、到期前 3 個月。</li>
           <li>測試請用假資料，不要輸入真實的供應商機密資料。</li>
@@ -291,7 +290,7 @@ function filteredRecords(){
   return ofType(curType).filter(r=>{
     if(!inTab(r,listTab)) return false;
     if(listStatus && statusOf(r).k!==listStatus) return false;
-    if(q){ const hay=[r.docNo,r.supplier,itemLabel(r),rangeText(r),r.fileLoc,r.note].join(' ').toLowerCase(); if(!hay.includes(q)) return false; }
+    if(q){ const hay=[r.docNo,r.supplier,itemLabel(r),rangeText(r),r.note].join(' ').toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   }).sort((a,b)=>{
     const sa=statusOf(a), sb=statusOf(b);
@@ -336,7 +335,7 @@ function renderTable(){
   const rs = filteredRecords(), cal = curType==='cal';
   const vis = new Set(rs.map(r=>r.uid)); listSel = new Set([...listSel].filter(id=>vis.has(id)));
   if(!rs.length){ $('#tableBox').innerHTML = `<div class="empty">${ofType(curType).length?'沒有符合條件的紀錄':'目前還沒有紀錄，請按「新增紀錄」開始'}</div>`; return; }
-  const n = listSel.size, clip = r => (r.fileLoc || (r.files||[]).length) ? ' <span title="有附件或檔案位置">📎</span>' : '';
+  const n = listSel.size, clip = r => (r.files||[]).length ? ' <span title="有附件">📎</span>' : '';
   const no = r => r.docNo ? `<span class="st-sub">${esc(r.docNo)}</span>` : '';
   $('#tableBox').innerHTML = `<div class="row" style="margin-bottom:8px">
       <button class="danger" onclick="listDelete()" ${n?'':'disabled'}>刪除${n?'（'+n+'）':''}</button>
@@ -409,9 +408,6 @@ function renderDetail(){
         ${r.docType==='cal' ? calFields(r) : `
         <div><label class="f req">${t.sup}</label><input type="text" data-f="supplier" value="${esc(r.supplier)}" oninput="onField(this)"></div>
         <div><label class="f req">${t.item}</label><input type="text" data-f="item" value="${esc(r.item)}" oninput="onField(this)"></div>`}
-        <div class="full"><label class="f">檔案位置（資料夾路徑或雲端連結，選填）</label>
-          <input type="text" data-f="fileLoc" value="${esc(r.fileLoc)}" placeholder="例：公司共用硬碟／COA／王小明食品行_2026.pdf" oninput="onField(this)">
-          <div class="small" style="margin-top:3px"><a id="fileLink" target="_blank" rel="noopener noreferrer">開啟連結 ↗</a></div></div>
         <div class="full"><label class="f">附件（圖片或 PDF，選填，單檔 20 MB 以內）</label>
           <input type="file" accept="image/*,application/pdf" multiple onchange="addFiles(this)">
           <div class="muted small" style="margin-top:3px">附件只存在這台電腦的這個瀏覽器裡</div>
@@ -491,7 +487,6 @@ function refreshForm(){
   const re=recvError(r); $('#recvErr').textContent=re; $('#inRecv').classList.toggle('bad',!!re);
   const qc=$('#inQc'); qc.disabled=!r.receivedDate; if(qc.value!==r.qc) qc.value=r.qc;
   $('#qcHint').textContent = r.receivedDate ? '' : '（收到文件後才能判定品質）';
-  const a=$('#fileLink'), ok=isUrl(r.fileLoc); a.style.display=ok?'':'none'; if(ok) a.href=r.fileLoc.trim(); else a.removeAttribute('href');
   $('#stBadge').innerHTML = statusBadge(r); $('#stBox').innerHTML = statusBadge(r);
   $('#dirtyMark').innerHTML = dirty ? '<span class="dirty">● 有尚未儲存的修改</span>' : '';
 }
@@ -594,10 +589,10 @@ function exportCSV(){
   const rs=filteredRecords(), cal=curType==='cal';
   if(!rs.length){ alert('目前篩選條件下沒有紀錄可匯出。'); return; }
   const head=['文件編號','文件類型', cal?'儀器名稱':'供應商名稱', cal?'校正範圍':'原料或產品名稱', ...(cal?['校正公司']:[]),
-    '收件日期','應提供或更新日期','文件收件狀態','狀態說明','品質確認狀態','檔案位置','附件數','備註','最後儲存'];
+    '收件日期','應提供或更新日期','文件收件狀態','狀態說明','品質確認狀態','附件數','備註','最後儲存'];
   const rows=rs.map(r=>{ const s=statusOf(r);
     return [r.docNo,TYPES[r.docType].name, cal?itemLabel(r):r.supplier, cal?rangeText(r):r.item, ...(cal?[r.supplier]:[]),
-      r.receivedDate,r.dueDate,s.t,s.extra||'',QC[r.qc],r.fileLoc,(r.files||[]).length,r.note,r.updatedAt]; });
+      r.receivedDate,r.dueDate,s.t,s.extra||'',QC[r.qc],(r.files||[]).length,r.note,r.updatedAt]; });
   const csv=[head,...rows].map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
   download('﻿'+csv, `${curType}_report_${today()}.csv`, 'text/csv;charset=utf-8');
 }
