@@ -25,6 +25,7 @@ label.f{display:block;font-size:13px;color:var(--muted);margin-bottom:4px;font-w
 .req::after{content:" *";color:var(--bad)}
 input[type=text],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid #c5cfcb;border-radius:6px;font:inherit;background:#fff;color:inherit}
 textarea{min-height:70px;resize:vertical}
+input.bad{border-color:var(--bad)!important;background:var(--bad-soft)!important}
 input:disabled,select:disabled,textarea:disabled{background:#f1f3f2;color:#444}
 button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid #c5cfcb;background:#fff;color:var(--ink);padding:7px 14px}
 button:hover{background:#f0f3f2}
@@ -420,8 +421,8 @@ function renderDetail(){
     <div class="card">
       <h2><span class="no">2</span>收件與更新日期</h2>
       <div class="grid">
-        <div><label class="f">收件日期</label><input type="date" data-f="receivedDate" value="${esc(r.receivedDate)}" oninput="onField(this)">
-          <div class="muted small" style="margin-top:3px">尚未收到文件請留空</div></div>
+        <div><label class="f">收件日期</label><input type="date" data-f="receivedDate" id="inRecv" max="${today()}" value="${esc(r.receivedDate)}" oninput="onField(this)">
+          <div class="muted small" style="margin-top:3px">尚未收到文件請留空</div><div class="ferr" id="recvErr"></div></div>
         <div><label class="f">應提供或更新日期（下次要更新的日子）</label><input type="date" class="dl-input" data-f="dueDate" id="inDue" value="${esc(r.dueDate)}" oninput="onField(this)">
           <div class="dl-hint" id="dueHint"></div><div class="ferr" id="dueErr"></div></div>
         <div><label class="f">文件收件狀態（系統依日期自動判斷）</label><div id="stBox" style="padding-top:6px"></div></div>
@@ -476,6 +477,7 @@ function removeAtt(id){
   cur.files=cur.files.filter(f=>f.id!==id); dirty=true; refreshForm(); renderAtts();
 }
 
+function recvError(r){ return r.receivedDate && r.receivedDate > today() ? '收件日期不能晚於今天' : ''; }
 function dueError(r){
   if(r.receivedDate && !r.dueDate) return '請填寫應提供或更新日期';
   if(r.receivedDate && r.dueDate && r.dueDate < r.receivedDate) return '應提供或更新日期不能早於收件日期';
@@ -486,6 +488,7 @@ function refreshForm(){
   const due=$('#inDue'); due.disabled=!r.receivedDate; if(due.value!==r.dueDate) due.value=r.dueDate;
   $('#dueHint').textContent = r.receivedDate ? `（預設：收件日期＋${t.months%12===0?t.months/12+' 年':t.months+' 個月'}，可自行修改；到期前 ${t.lead} 個月開始顯示「需要更新」）` : '（收到文件、填寫收件日期後，會自動帶出預設日期）';
   const e=dueError(r); $('#dueErr').textContent=e; due.classList.toggle('bad',!!e);
+  const re=recvError(r); $('#recvErr').textContent=re; $('#inRecv').classList.toggle('bad',!!re);
   const qc=$('#inQc'); qc.disabled=!r.receivedDate; if(qc.value!==r.qc) qc.value=r.qc;
   $('#qcHint').textContent = r.receivedDate ? '' : '（收到文件後才能判定品質）';
   const a=$('#fileLink'), ok=isUrl(r.fileLoc); a.style.display=ok?'':'none'; if(ok) a.href=r.fileLoc.trim(); else a.removeAttribute('href');
@@ -514,6 +517,7 @@ function saveRecord(){
   if(!r.item.trim()) miss.push(t.item);
   else if(r.item==='其他' && !r.itemOther.trim()) miss.push('儀器名稱（其他）');
   if(miss.length){ alert('請先填寫：'+miss.join('、')); return; }
+  if(recvError(r)){ const el=$('#inRecv'); el.scrollIntoView({block:'center'}); el.focus(); alert('收件日期不能晚於今天'); return; }
   if(dueError(r)){ const el=$('#inDue'); el.scrollIntoView({block:'center'}); el.focus(); return; }
   const isNew=!r.uid;
   if(isNew){ r.uid=newUid(); r.createdAt=new Date().toLocaleString('zh-TW'); r.createdTs=Date.now(); }
