@@ -119,6 +119,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold);bo
 table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{border-bottom:1px solid var(--line);padding:8px 8px;text-align:left;vertical-align:top}
 th{background:#f7f1e6;color:var(--muted);font-weight:600;white-space:nowrap}
+td{overflow-wrap:anywhere}
+.st-sub,td .badge,td.nw{white-space:nowrap;overflow-wrap:normal}
+.mini li>span{min-width:0;overflow-wrap:anywhere}
+.trow .tx b{overflow-wrap:anywhere}
 tbody tr.click{cursor:pointer}
 tbody tr.click:hover{background:#f7f1e6}
 .muted{color:var(--muted)}
@@ -507,7 +511,7 @@ function renderTable(){
       ${cal
         ? `<td>${esc(itemLabel(r))}${clip(r)}${no(r)}</td><td>${statusBadge(r)}</td><td>${esc(rangeText(r))||'—'}</td><td>${esc(r.supplier)}</td>`
         : `<td>${esc(r.supplier)}${clip(r)}${no(r)}</td><td>${statusBadge(r)}</td><td>${esc(r.item)}</td>`}
-      <td>${r.receivedDate?fmtDate(r.receivedDate):'—'}</td><td>${r.dueDate?fmtDate(r.dueDate):'—'}</td>
+      <td class="nw">${r.receivedDate?fmtDate(r.receivedDate):'—'}</td><td class="nw">${r.dueDate?fmtDate(r.dueDate):'—'}</td>
       <td>${qcBadge(r)}</td></tr>`).join('')}
     </tbody></table></div>`;
 }
