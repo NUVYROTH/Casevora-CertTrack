@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Casevora COA Tracker</title>
+<style>
+:root{
+  --bg:#f4f6f5; --card:#ffffff; --ink:#1d2a26; --muted:#5f6f69; --line:#d9e0dd;
+  --brand:#1f6f5c; --brand-soft:#e3f1ec; --warn:#b45309; --warn-soft:#fff4e0;
+  --bad:#b42318; --bad-soft:#fdecea; --ok:#167a3e; --ok-soft:#e6f5ec; --info:#1d4f91; --info-soft:#e8f0fb;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;font-size:15px;line-height:1.6}
+header{background:var(--brand);color:#fff;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.5px}
+header .sub{font-size:13px;opacity:.85}
+main{max-width:1100px;margin:0 auto;padding:20px 16px 100px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin-bottom:16px}
+.card h2{margin:0 0 12px;font-size:17px;display:flex;align-items:center;gap:8px}
+.card h2 .no{background:var(--brand);color:#fff;border-radius:50%;width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 16px}
+.full{grid-column:1/-1}
+label.f{display:block;font-size:13px;color:var(--muted);margin-bottom:4px;font-weight:600}
+.req::after{content:" *";color:var(--bad)}
+input[type=text],input[type=date],select,textarea{width:100%;padding:8px 10px;border:1px solid #c5cfcb;border-radius:6px;font:inherit;background:#fff;color:inherit}
+textarea{min-height:70px;resize:vertical}
+input:disabled,select:disabled,textarea:disabled{background:#f1f3f2;color:#444}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid #c5cfcb;background:#fff;color:var(--ink);padding:7px 14px}
+button:hover{background:#f0f3f2}
+button.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+button.primary:hover{background:#185a4a}
+button.danger{color:var(--bad);border-color:#e7b4ae}
+button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.spacer{flex:1}
+.check{display:flex;gap:8px;align-items:flex-start;padding:6px 0}
+.check input{margin-top:5px}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;white-space:nowrap}
+.s-todo{background:var(--info-soft);color:var(--info)}
+.s-review{background:#efe9fb;color:#5b3a9c}
+.s-track{background:var(--warn-soft);color:var(--warn)}
+.s-ready{background:var(--ok-soft);color:var(--ok)}
+.s-closed{background:#e9ecea;color:#4b5a55}
+.s-over{background:var(--bad-soft);color:var(--bad)}
+.notice{border-radius:8px;padding:10px 14px;font-size:14px;margin:8px 0}
+.notice.info{background:var(--info-soft);color:#173d70}
+.notice.warn{background:var(--warn-soft);color:#7a3d06}
+.notice.bad{background:var(--bad-soft);color:#7d1a12}
+.notice.ok{background:var(--ok-soft);color:#0f5a2d}
+.notice ul{margin:4px 0 0;padding-left:20px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:8px 8px;text-align:left;vertical-align:top}
+th{background:#f7f9f8;color:var(--muted);font-weight:600;white-space:nowrap}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover{background:#f3f8f6}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.photos{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.photos .ph{position:relative}
+.photos img{width:110px;height:110px;object-fit:cover;border-radius:6px;border:1px solid var(--line);display:block}
+.photos .x{position:absolute;top:3px;right:3px;padding:0 6px;font-size:12px;line-height:18px;background:rgba(255,255,255,.9)}
+.tabs button{border-radius:999px;padding:4px 14px}
+.tabs button.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.savebar{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);padding:10px 16px;box-shadow:0 -2px 8px rgba(0,0,0,.05)}
+.savebar .in{max-width:1100px;margin:0 auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dl-input{border:2px solid #7c3aed!important;background:#f6f0ff!important}
+.dl-input.bad{border-color:var(--bad)!important;background:var(--bad-soft)!important}
+.rv-input{border:2px solid #7c3aed!important;background:#f6f0ff!important}
+.rv-hint{font-size:12px;color:#5b3a9c;margin-top:3px}
+.dl-hint{font-size:12px;color:#5b3a9c;margin-top:3px}
+.ferr{color:var(--bad);font-size:13px;font-weight:700;margin-top:3px}
+.dirty{color:var(--warn);font-weight:700;font-size:14px}
+.checks li{list-style:none;padding:2px 0}
+.checks{padding-left:0;margin:6px 0}
+.subbox{border:1px dashed #c5cfcb;border-radius:8px;padding:12px 14px;margin-top:10px;background:#fbfcfc}
+details summary{cursor:pointer;font-weight:700}
+.empty{text-align:center;padding:40px;color:var(--muted)}
+#print{display:none}
+
+
+.s-late{background:#fdecea;color:#7d1a12}
+.s-miss{background:#fff4e0;color:#7a3d06}
+.s-need{background:#efe9fb;color:#5b3a9c}
+.s-ok{background:#e6f5ec;color:#0f5a2d}
+.q-pending{background:#e9ecea;color:#4b5a55}
+.q-pass{background:#e6f5ec;color:#0f5a2d}
+.q-fail{background:#fdecea;color:#7d1a12}
+.st-sub{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.honest{font-size:13px;color:var(--muted);margin:0 0 12px}
+
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Casevora COA Tracker</h1>
+    <div class="sub">COA 文件追蹤助手｜本機儲存 · 僅在此裝置此瀏覽器有效 · 可匯出備份</div>
+  </div>
+</header>
+<main id="app"></main>
+<script>
+const KEY = 'casevoraCoaTracker_v1';
+const KEY_N = 'casevoraCoaTracker_v1_counter';
+const TYPES = {
+  coa: {name:'COA',               months:12, lead:3, sup:'供應商名稱', item:'原料或產品名稱'},
+  raw: {name:'原物料外檢報告',     months:4,  lead:1, sup:'供應商名稱', item:'原料或產品名稱'},
+  cal: {name:'儀器校正外檢報告',   months:12, lead:3, sup:'校正單位',   item:'儀器名稱'}
+};
+const QC = {pending:'尚未判定', pass:'合格', fail:'不合格'};
+let records = loadAll();
+let cur = null, dirty = false, showErr = false;
+let listTab = 'todo', listSearch = '', listStatus = '';
+let listSel = new Set(), trashSel = new Set();
+const live = () => records.filter(r=>!r.deleted);
+const $ = s => document.querySelector(s);
+
+/* ---------- 小工具 ---------- */
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function nl2br(s){ return esc(s).replace(/\n/g,'<br>'); }
+const p2 = n => String(n).padStart(2,'0');
+function today(){ const d=new Date(); return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function addDays(ymd,n){ const [y,m,d]=ymd.split('-').map(Number); const t=new Date(y,m-1,d+n); return t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(t.getDate()); }
+function addMonths(ymd,n){ const [y,m,d]=ymd.split('-').map(Number); const t=new Date(y,m-1+n,1); const last=new Date(t.getFullYear(),t.getMonth()+1,0).getDate(); return t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(Math.min(d,last)); }
+function daysBetween(a,b){ const [y1,m1,d1]=a.split('-').map(Number), [y2,m2,d2]=b.split('-').map(Number); return Math.round((new Date(y2,m2-1,d2)-new Date(y1,m1-1,d1))/86400000); }
+function fmtDate(s){ if(!s) return ''; const [y,m,d]=s.split('-'); return `${y}/${m}/${d}`; }
+function flash(t){
+  const d = document.createElement('div'); d.textContent = t;
+  d.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1f6f5c;color:#fff;padding:8px 20px;border-radius:6px;z-index:99;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+  document.body.appendChild(d); setTimeout(()=>d.remove(),1500);
+}
+function download(content, name, type){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type})); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+/* ---------- 資料 ---------- */
+function blankRecord(){
+  return {id:'', createdAt:'', updatedAt:'', docType:'coa', supplier:'', item:'', receivedDate:'', dueDate:'', qc:'pending', note:''};
+}
+function migrate(r){ const b=blankRecord(); const o=Object.assign(b,r||{}); if(!TYPES[o.docType]) o.docType='coa'; if(!QC[o.qc]) o.qc='pending'; return o; }
+function loadAll(){ try{ return (JSON.parse(localStorage.getItem(KEY))||[]).map(migrate); }catch(e){ return []; } }
+function getCounter(){ let n=0; try{ n=parseInt(localStorage.getItem(KEY_N),10)||0; }catch(e){} records.forEach(r=>{ const m=/^COA-(\d+)$/.exec(r.id||''); if(m) n=Math.max(n,+m[1]); }); return n; }
+function genId(){ return 'COA-'+String(getCounter()+1).padStart(3,'0'); }
+function persist(counter){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(records));
+    if(counter!=null) localStorage.setItem(KEY_N, String(counter));
+    const used=(localStorage.getItem(KEY)||'').length;
+    if(used>4000000 && !window.__warned){ window.__warned=true; alert('提醒：本機儲存空間已用約 80% 以上。請盡快按「下載備份」，並刪除不需要的舊紀錄。'); }
+    return true;
+  }catch(e){ alert('儲存失敗！\n瀏覽器的儲存空間可能已滿。請先「下載備份」，再刪除部分紀錄。'); return false; }
+}
+
+/* ---------- 狀態規則（依日期自動判斷） ---------- */
+function statusOf(r){
+  const t = TYPES[r.docType]||TYPES.coa, td = today();
+  if(!r.receivedDate) return {k:'missing', t:'缺件', c:'s-miss', rank:1, extra:'尚未收到文件'};
+  if(r.dueDate && r.dueDate < td){ const d=daysBetween(r.dueDate,td); return {k:'late', t:'尚未更新', c:'s-late', rank:0, extra:`逾期 ${d} 天`, days:d}; }
+  const left = r.dueDate ? daysBetween(td,r.dueDate) : null;
+  const soon = r.dueDate && addMonths(td,t.lead) >= r.dueDate;
+  if(r.qc==='fail' || soon){
+    const parts=[]; if(r.qc==='fail') parts.push('品質不合格，需換新版'); if(left!=null) parts.push(`剩 ${left} 天到期`);
+    return {k:'need', t:'需要更新', c:'s-need', rank:2, extra:parts.join('｜')};
+  }
+  return {k:'ok', t:'已更新', c:'s-ok', rank:3, extra:left!=null?`還有 ${left} 天到期`:''};
+}
+function statusBadge(r){ const s=statusOf(r); return `<span class="badge ${s.c}">${s.t}</span>${s.extra?`<span class="st-sub">${esc(s.extra)}</span>`:''}`; }
+function qcBadge(r){ const c={pending:'q-pending',pass:'q-pass',fail:'q-fail'}[r.qc]; return `<span class="badge ${c}">${QC[r.qc]}</span>`; }
+function autoOf(r){ return r.receivedDate ? addMonths(r.receivedDate,(TYPES[r.docType]||TYPES.coa).months) : ''; }
+
+/* =========================================================
+   清單頁
+   ========================================================= */
+const TABS = [['todo','待辦'],['missing','缺件'],['need','需要更新'],['late','尚未更新'],['fail','不合格'],['all','全部']];
+function inTab(r,tab){
+  const s=statusOf(r);
+  switch(tab){ case 'todo': return s.k!=='ok'; case 'missing': return s.k==='missing'; case 'need': return s.k==='need';
+    case 'late': return s.k==='late'; case 'fail': return r.qc==='fail'; default: return true; }
+}
+function filteredRecords(){
+  const q = listSearch.trim().toLowerCase();
+  return live().filter(r=>{
+    if(!inTab(r,listTab)) return false;
+    if(listStatus && statusOf(r).k!==listStatus) return false;
+    if(q){ const hay=[r.id,r.supplier,r.item,TYPES[r.docType].name,r.note].join(' ').toLowerCase(); if(!hay.includes(q)) return false; }
+    return true;
+  }).sort((a,b)=>{
+    const sa=statusOf(a), sb=statusOf(b);
+    if(sa.rank!==sb.rank) return sa.rank-sb.rank;
+    if(sa.rank===1) return (a.createdAt||'')<(b.createdAt||'')?1:-1;
+    return (a.dueDate||'9999')<(b.dueDate||'9999')?-1:(a.dueDate===b.dueDate?0:1);
+  });
+}
+function showList(){
+  if(dirty && !confirm('有尚未儲存的修改，確定要離開嗎？')) return;
+  cur=null; dirty=false; listSel=new Set();
+  const cnt = {}; TABS.forEach(([k])=>cnt[k]=live().filter(r=>inTab(r,k)).length);
+  $('#app').innerHTML = `
+    <div class="card">
+      <div class="row">
+        <button class="primary" onclick="openRecord()">＋ 新增 COA 紀錄</button>
+        <span class="spacer"></span>
+        <button onclick="showTrash()">最近刪除（${records.filter(r=>r.deleted).length}）</button>
+        <button onclick="exportCSV()">匯出報表（Excel 可開）</button>
+        <button onclick="backup()">下載備份</button>
+        <button onclick="$('#restoreFile').click()">從備份還原</button>
+        <input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)">
+      </div>
+    </div>
+    <div class="card">
+      <div class="row tabs" style="margin-bottom:12px">
+        ${TABS.map(([k,n])=>`<button class="${listTab===k?'on':''}" onclick="listTab='${k}';showList()">${n}（${cnt[k]}）</button>`).join('')}
+      </div>
+      <div class="row" style="margin-bottom:12px">
+        <input type="text" placeholder="搜尋供應商、原料／產品、儀器、編號…" style="max-width:320px" value="${esc(listSearch)}" oninput="listSearch=this.value;renderTable()">
+        <select style="width:auto" onchange="listStatus=this.value;renderTable()">
+          <option value="">全部文件狀態</option>
+          ${[['missing','缺件'],['ok','已更新'],['need','需要更新'],['late','尚未更新']].map(([k,n])=>`<option value="${k}" ${listStatus===k?'selected':''}>${n}</option>`).join('')}
+        </select>
+      </div>
+      <div id="tableBox"></div>
+    </div>
+    <div class="card">
+      <details>
+        <summary>使用說明</summary>
+        <ol class="small">
+          <li>先「新增 COA 紀錄」建立應收文件清單；還沒收到文件時，收件日期留空，狀態會顯示「缺件」。</li>
+          <li>收到文件後，修改該筆、填上收件日期，「應提供或更新日期」會自動帶出預設值（可自行修改），並由品管人員判定品質確認狀態。</li>
+          <li>「待辦」分頁會列出缺件、需要更新、尚未更新（已過期）和品質不合格的紀錄。</li>
+          <li>文件收件狀態由日期自動判斷，不用手動選：缺件＝沒有收件日期；需要更新＝進入到期前提示期或品質不合格；尚未更新＝已過到期日；已更新＝其餘。</li>
+          <li>預設更新週期與提示期：COA 一年、到期前 3 個月；原物料外檢報告 4 個月、到期前 1 個月；儀器校正外檢報告 一年、到期前 3 個月。</li>
+          <li>「已收到文件」與「品質已確認」是兩件事，分開記錄。</li>
+          <li>測試請用假資料，不要輸入真實的供應商機密資料。</li>
+        </ol>
+      </details>
+    </div>
+    <div class="card">
+      <details>
+        <summary>資料保存方式與限制（請務必閱讀）</summary>
+        <ul class="small">
+          <li><b>本機儲存 · 僅在此裝置此瀏覽器有效 · 可匯出備份。</b>資料存在這台電腦、這個瀏覽器裡，不會上傳，也不會同步到其他電腦或手機。</li>
+          <li>換瀏覽器、換電腦、使用無痕視窗，都看不到原本的資料。</li>
+          <li>清除瀏覽資料（勾選「Cookie 和其他網站資料」）會讓全部紀錄消失且無法復原。</li>
+          <li>請定期按「下載備份」，把備份檔放在這台電腦以外的地方（雲端硬碟或寄給自己）。</li>
+          <li>「最近刪除」的紀錄保留 30 天，超過的會在「下次打開本工具時」永久刪除（不是準時自動刪除）。</li>
+        </ul>
+      </details>
+    </div>`;
+  renderTable();
+}
+function renderTable(){
+  const rs = filteredRecords();
+  const vis = new Set(rs.map(r=>r.id)); listSel = new Set([...listSel].filter(id=>vis.has(id)));
+  if(!rs.length){ $('#tableBox').innerHTML = `<div class="empty">${live().length?'沒有符合條件的紀錄':'目前還沒有紀錄，請按「新增 COA 紀錄」開始'}</div>`; return; }
+  const n = listSel.size;
+  $('#tableBox').innerHTML = `<div class="row" style="margin-bottom:8px">
+      <button id="listDel" class="danger" onclick="listDelete()" ${n?'':'disabled'}>刪除${n?'（'+n+'）':''}</button>
+      <span class="muted small">${n?'已勾選 '+n+' 筆':'勾選紀錄後可刪除'}</span></div>
+    <div style="overflow-x:auto"><table>
+    <thead><tr><th></th><th>供應商／校正單位</th><th>文件狀態</th><th>原料／產品／儀器</th><th>文件類型</th><th>收件日期</th><th>應提供或更新日期</th><th>品質確認</th></tr></thead>
+    <tbody>${rs.map(r=>`<tr class="click" onclick="openRecord('${r.id}')">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="liChk" data-id="${esc(r.id)}" ${listSel.has(r.id)?'checked':''} onchange="listToggle(this)"></td>
+      <td>${esc(r.supplier)}<span class="st-sub">${esc(r.id)}</span></td><td>${statusBadge(r)}</td><td>${esc(r.item)}</td><td class="small">${esc(TYPES[r.docType].name)}</td>
+      <td>${r.receivedDate?fmtDate(r.receivedDate):'—'}</td><td>${r.dueDate?fmtDate(r.dueDate):'—'}</td>
+      <td>${qcBadge(r)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function listToggle(el){ const id=el.dataset.id; if(el.checked) listSel.add(id); else listSel.delete(id); renderTable(); }
+function listDelete(){
+  const ids=[...listSel].filter(id=>{ const r=records.find(x=>x.id===id); return r && !r.deleted; });
+  if(!ids.length) return;
+  if(!confirm(`確定要刪除選取的 ${ids.length} 筆嗎？`)) return;
+  const done=[]; records.forEach(r=>{ if(ids.includes(r.id)){ r.deleted=true; r.deletedAt=today(); done.push(r); } });
+  if(!persist()){ done.forEach(r=>{ r.deleted=false; delete r.deletedAt; }); return; }
+  listSel=new Set(); showList(); flash('已移到「最近刪除」（'+done.length+' 筆）');
+}
+
+/* =========================================================
+   單筆紀錄頁
+   ========================================================= */
+function openRecord(id){
+  if(id){ const r=records.find(x=>x.id===id); if(!r||r.deleted) return; cur=JSON.parse(JSON.stringify(r)); }
+  else cur=blankRecord();
+  dirty=false; showErr=false; renderDetail(); window.scrollTo(0,0);
+}
+function renderDetail(){
+  const r=cur, isNew=!r.id;
+  $('#app').innerHTML = `
+    <div class="row" style="margin-bottom:12px">
+      <button onclick="showList()">← 返回清單</button>
+      <h2 style="margin:0 8px;font-size:18px">${isNew?'新增 COA 紀錄':esc(r.id)}</h2>
+      <span id="stBadge"></span><span class="spacer"></span>
+      ${isNew?'':`<button class="danger" onclick="deleteRecord()">刪除此筆</button>`}
+    </div>
+    <div class="card">
+      <h2><span class="no">1</span>文件資料</h2>
+      <div class="grid">
+        <div><label class="f req">文件類型</label>
+          <select data-f="docType" onchange="onField(this)">${Object.entries(TYPES).map(([k,t])=>`<option value="${k}" ${r.docType===k?'selected':''}>${t.name}</option>`).join('')}</select></div>
+        <div><label class="f req" id="lbSup"></label><input type="text" data-f="supplier" value="${esc(r.supplier)}" oninput="onField(this)"></div>
+        <div><label class="f req" id="lbItem"></label><input type="text" data-f="item" value="${esc(r.item)}" oninput="onField(this)"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="no">2</span>收件與更新日期</h2>
+      <div class="grid">
+        <div><label class="f">收件日期</label><input type="date" data-f="receivedDate" value="${esc(r.receivedDate)}" oninput="onField(this)">
+          <div class="muted small" style="margin-top:3px">尚未收到文件請留空</div></div>
+        <div><label class="f">應提供或更新日期（下次要更新的日子）</label><input type="date" class="dl-input" data-f="dueDate" id="inDue" value="${esc(r.dueDate)}" oninput="onField(this)">
+          <div class="dl-hint" id="dueHint"></div><div class="ferr" id="dueErr"></div></div>
+        <div><label class="f">文件收件狀態（系統依日期自動判斷）</label><div id="stBox" style="padding-top:6px"></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="no">3</span>品質確認</h2>
+      <div class="grid">
+        <div><label class="f">品質確認狀態</label>
+          <select data-f="qc" id="inQc" onchange="onField(this)">${Object.entries(QC).map(([k,n])=>`<option value="${k}" ${r.qc===k?'selected':''}>${n}</option>`).join('')}</select>
+          <div class="muted small" id="qcHint" style="margin-top:3px"></div></div>
+        <div class="full"><label class="f">備註</label><textarea data-f="note" oninput="onField(this)">${esc(r.note)}</textarea></div>
+      </div>
+    </div>
+    <div class="savebar"><div class="in">
+      <button class="primary" onclick="saveRecord()">儲存</button>
+      <button onclick="showList()">返回清單</button>
+      <span id="dirtyMark"></span><span class="spacer"></span>
+      <span class="muted small" id="savedAt">${r.updatedAt?'最後儲存：'+esc(r.updatedAt):'尚未儲存'}</span>
+    </div></div>`;
+  refreshForm();
+}
+function dueError(r){
+  if(r.receivedDate && !r.dueDate) return '請填寫應提供或更新日期';
+  if(r.receivedDate && r.dueDate && r.dueDate < r.receivedDate) return '應提供或更新日期不能早於收件日期';
+  return '';
+}
+function refreshForm(){
+  const r=cur, t=TYPES[r.docType];
+  $('#lbSup').textContent=t.sup; $('#lbItem').textContent=t.item;
+  const due=$('#inDue'); due.disabled=!r.receivedDate; if(due.value!==r.dueDate) due.value=r.dueDate;
+  $('#dueHint').textContent = r.receivedDate ? `（預設：收件日期＋${t.months%12===0?t.months/12+' 年':t.months+' 個月'}，可自行修改；到期前 ${t.lead} ${'個月'}開始顯示「需要更新」）` : '（收到文件、填寫收件日期後，會自動帶出預設日期）';
+  const e=dueError(r); $('#dueErr').textContent=e; due.classList.toggle('bad',!!e);
+  const qc=$('#inQc'); qc.disabled=!r.receivedDate; if(qc.value!==r.qc) qc.value=r.qc;
+  $('#qcHint').textContent = r.receivedDate ? '' : '（收到文件後才能判定品質）';
+  $('#stBadge').innerHTML = statusBadge(r); $('#stBox').innerHTML = statusBadge(r);
+  $('#dirtyMark').innerHTML = dirty ? '<span class="dirty">● 有尚未儲存的修改</span>' : '';
+}
+function onField(el){
+  const f=el.dataset.f, oldAuto=autoOf(cur);
+  cur[f]=el.value; dirty=true;
+  if(f==='receivedDate'||f==='docType'){
+    if(cur.receivedDate && (!cur.dueDate || cur.dueDate===oldAuto)) cur.dueDate=autoOf(cur);
+    if(!cur.receivedDate){ cur.dueDate=''; cur.qc='pending'; }
+  }
+  refreshForm();
+}
+function saveRecord(){
+  const r=cur, miss=[];
+  if(!r.supplier.trim()) miss.push(TYPES[r.docType].sup);
+  if(!r.item.trim()) miss.push(TYPES[r.docType].item);
+  if(miss.length){ alert('請先填寫：'+miss.join('、')); return; }
+  if(dueError(r)){ const el=$('#inDue'); el.scrollIntoView({block:'center'}); el.focus(); return; }
+  const isNew=!r.id; let counter=null;
+  if(isNew){ const n=getCounter()+1; r.id='COA-'+String(n).padStart(3,'0'); r.createdAt=new Date().toLocaleString('zh-TW'); counter=n; }
+  r.updatedAt=new Date().toLocaleString('zh-TW');
+  const backupList=records.slice(), i=records.findIndex(x=>x.id===r.id), copy=JSON.parse(JSON.stringify(r));
+  if(i>=0) records[i]=copy; else records.push(copy);
+  if(!persist(counter)){ records=backupList; if(isNew){ r.id=''; } return; }
+  dirty=false;
+  if(isNew){ showList(); flash('已儲存 '+copy.id); return; }
+  $('#savedAt').textContent='最後儲存：'+r.updatedAt; $('#app').querySelector('h2').textContent=r.id; refreshForm(); flash('已儲存');
+}
+function deleteRecord(){
+  if(!confirm('確定要刪除嗎？')) return;
+  const rec=records.find(x=>x.id===cur.id); if(!rec) return;
+  rec.deleted=true; rec.deletedAt=today();
+  if(!persist()){ rec.deleted=false; delete rec.deletedAt; return; }
+  dirty=false; showList(); flash('已移到「最近刪除」');
+}
+window.addEventListener('beforeunload', e=>{ if(dirty){ e.preventDefault(); e.returnValue=''; } });
+
+/* =========================================================
+   最近刪除
+   ========================================================= */
+function trashList(){ return records.filter(r=>r.deleted).sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||'')||b.id.localeCompare(a.id)); }
+function daysLeft(r){ return 30-daysBetween(r.deletedAt||today(),today()); }
+function showTrash(){ if(dirty && !confirm('有尚未儲存的修改，確定要離開嗎？')) return; dirty=false; cur=null; trashSel=new Set(); renderTrash(); window.scrollTo(0,0); }
+function renderTrash(){
+  const rs=trashList(), n=trashSel.size;
+  $('#app').innerHTML = `
+    <div class="row" style="margin-bottom:12px"><button onclick="showList()">← 返回清單</button><h2 style="margin:0 8px;font-size:18px">最近刪除</h2></div>
+    <div class="card">
+      <div class="notice info small">已刪除超過 30 天的紀錄，會在下次打開本工具時永久刪除。</div>
+      <div class="row" style="margin:8px 0">
+        <button id="trAll" onclick="trashAll()" ${rs.length?'':'disabled'}>全選</button>
+        <button id="trNone" onclick="trashNone()" ${n?'':'disabled'}>全部不選</button>
+        <button id="trRestore" onclick="trashRestore()" ${n?'':'disabled'}>還原</button>
+        <button id="trPerm" class="danger" onclick="trashPerm()" ${n?'':'disabled'}>永久刪除</button>
+        <span class="muted small">${n?('已勾選 '+n+' 筆'):'請先勾選紀錄'}</span>
+      </div>
+      ${rs.length?`<div style="overflow-x:auto"><table><thead><tr><th></th><th>編號</th><th>刪除日期</th><th>供應商／校正單位</th><th>原料／產品／儀器</th><th>文件類型</th><th>保留</th></tr></thead><tbody>
+        ${rs.map(r=>`<tr><td><input type="checkbox" class="trChk" data-id="${esc(r.id)}" ${trashSel.has(r.id)?'checked':''} onchange="trashToggle(this)"></td>
+          <td>${esc(r.id)}</td><td>${fmtDate(r.deletedAt)}</td><td>${esc(r.supplier)}</td><td>${esc(r.item)}</td><td class="small">${esc(TYPES[r.docType].name)}</td><td class="small muted">剩 ${Math.max(daysLeft(r),0)} 天</td></tr>`).join('')}
+      </tbody></table></div>`:'<div class="empty">目前沒有刪除的紀錄</div>'}
+    </div>`;
+}
+function trashToggle(el){ const id=el.dataset.id; if(el.checked) trashSel.add(id); else trashSel.delete(id); renderTrash(); }
+function trashAll(){ trashSel=new Set(trashList().map(r=>r.id)); renderTrash(); }
+function trashNone(){ trashSel=new Set(); renderTrash(); }
+function trashRestore(){
+  if(!trashSel.size) return;
+  const ids=[...trashSel], done=[];
+  records.forEach(r=>{ if(ids.includes(r.id)&&r.deleted){ r.deleted=false; delete r.deletedAt; done.push(r); } });
+  if(!persist()){ done.forEach(r=>{ r.deleted=true; r.deletedAt=today(); }); return; }
+  trashSel=new Set(); renderTrash(); flash('已還原 '+done.length+' 筆');
+}
+function trashPerm(){
+  const n=trashSel.size; if(!n) return;
+  if(!confirm(`確定要永久刪除選取的 ${n} 筆嗎？永久刪除後無法復原。`)) return;
+  const ids=new Set(trashSel), old=records, c=getCounter();
+  records=records.filter(r=>!ids.has(r.id));
+  if(!persist(c)){ records=old; return; }
+  trashSel=new Set(); renderTrash(); flash('已永久刪除 '+n+' 筆');
+}
+function purgeExpired(){
+  const exp=records.filter(r=>r.deleted&&r.deletedAt&&today()>addDays(r.deletedAt,30));
+  if(!exp.length) return;
+  const c=getCounter(), ids=new Set(exp.map(r=>r.id)); records=records.filter(r=>!ids.has(r.id)); persist(c);
+}
+
+/* =========================================================
+   匯出、備份、還原
+   ========================================================= */
+function exportCSV(){
+  const rs=filteredRecords();
+  if(!rs.length){ alert('目前篩選條件下沒有紀錄可匯出。'); return; }
+  const head=['編號','文件類型','供應商／校正單位','原料／產品／儀器','收件日期','應提供或更新日期','文件收件狀態','狀態說明','品質確認狀態','備註','最後儲存'];
+  const rows=rs.map(r=>{ const s=statusOf(r); return [r.id,TYPES[r.docType].name,r.supplier,r.item,r.receivedDate,r.dueDate,s.t,s.extra||'',QC[r.qc],r.note,r.updatedAt]; });
+  const csv=[head,...rows].map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+  download('\ufeff'+csv, `coa_report_${today()}.csv`, 'text/csv;charset=utf-8');
+}
+function backup(){
+  download(JSON.stringify({app:'casevoraCoaTracker', version:1, exportedAt:new Date().toISOString(), counter:getCounter(), records:live()},null,1),
+    `coa_backup_${today()}.json`, 'application/json');
+}
+function restore(input){
+  const file=input.files[0]; input.value=''; if(!file) return;
+  const fr=new FileReader();
+  fr.onload=()=>{
+    let data;
+    try{ data=JSON.parse(fr.result); if(!data || data.app!=='casevoraCoaTracker' || !Array.isArray(data.records)) throw 0; }
+    catch(e){ alert('無法讀取：這不是本工具的備份檔。'); return; }
+    const trashN=records.filter(r=>r.deleted).length;
+    if(!confirm(`備份檔內有 ${data.records.length} 筆紀錄。\n還原會「取代」目前瀏覽器中的 ${live().length} 筆資料，目前「最近刪除」裡的 ${trashN} 筆也會一併被取代，確定嗎？`)) return;
+    const old=records;
+    records=data.records.filter(r=>r&&typeof r==='object').map(r=>migrate(Object.assign({},r,{deleted:false})));
+    let c=Math.max(getCounter(), parseInt(data.counter,10)||0);
+    if(!persist(c)){ records=old; return; }
+    flash('還原完成'); showList();
+  };
+  fr.readAsText(file);
+}
+
+(function init(){
+  try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); }
+  catch(e){ alert('注意：目前瀏覽器無法保存資料（可能是無痕模式或已封鎖網站資料），關閉後資料會遺失。'); }
+  purgeExpired(); showList();
+})();
+</script>
+</body>
+</html>
