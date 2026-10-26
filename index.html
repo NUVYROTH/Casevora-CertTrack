@@ -75,6 +75,12 @@ details summary{cursor:pointer;font-weight:700}
 .range select{width:auto}
 .range .u{font-weight:700;min-width:28px}
 .range + .range{margin-top:8px}
+.atts{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.att{width:130px;border:1px solid var(--line);border-radius:8px;padding:6px;background:#fbfcfc;font-size:12px}
+.att a.pv{display:flex;align-items:center;justify-content:center;height:100px;border-radius:6px;background:#eef2f0;overflow:hidden;text-decoration:none;font-size:40px}
+.att img{width:100%;height:100%;object-fit:cover}
+.att .nm{display:block;margin:4px 0;word-break:break-all;line-height:1.3}
+.att button{padding:2px 8px;font-size:12px}
 </style>
 </head>
 <body>
@@ -131,10 +137,34 @@ function download(content, name, type){
   document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
+/* ---------- 附件（圖片／PDF）存在瀏覽器的 IndexedDB ---------- */
+const MAX_FILE = 20*1024*1024;
+let dbp = null, attUrls = [];
+function db(){ return dbp || (dbp = new Promise((ok,no)=>{ const q=indexedDB.open('casevoraCoaFiles',1);
+  q.onupgradeneeded=()=>q.result.createObjectStore('files',{keyPath:'id'}); q.onsuccess=()=>ok(q.result); q.onerror=()=>no(q.error); })); }
+async function fx(mode, fn){ const d=await db(); return new Promise((ok,no)=>{ const tx=d.transaction('files',mode), q=fn(tx.objectStore('files'));
+  tx.oncomplete=()=>ok(q&&q.result); tx.onerror=()=>no(tx.error); tx.onabort=()=>no(tx.error); }); }
+const fPut = o => fx('readwrite', st=>st.put(o));
+const fGet = id => fx('readonly', st=>st.get(id));
+const fAll = () => fx('readonly', st=>st.getAll());
+const fKeys = () => fx('readonly', st=>st.getAllKeys());
+const fClear = () => fx('readwrite', st=>st.clear());
+function fmtSize(n){ return n>=1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
+/* 刪掉沒有任何紀錄在用的附件（包含「最近刪除」裡的紀錄都算在用） */
+async function cleanupFiles(){
+  try{
+    const used=new Set(records.flatMap(r=>(r.files||[]).map(f=>f.id)));
+    if(cur) (cur.files||[]).forEach(f=>used.add(f.id));
+    const keys=(await fKeys()).filter(k=>!used.has(k));
+    if(keys.length) await fx('readwrite', st=>{ keys.forEach(k=>st.delete(k)); });
+  }catch(e){}
+}
+const blobToDataUrl = b => new Promise((ok,no)=>{ const fr=new FileReader(); fr.onload=()=>ok(fr.result); fr.onerror=()=>no(fr.error); fr.readAsDataURL(b); });
+
 /* ---------- 資料 ---------- */
 function blankRecord(type){
   return {uid:'', docType:type||'coa', docNo:'', supplier:'', item:'', itemOther:'', rFrom:'', rTo:'', rUnit:'', r2From:'', r2To:'',
-          fileLoc:'', receivedDate:'', dueDate:'', qc:'pending', note:'', createdAt:'', createdTs:0, updatedAt:''};
+          fileLoc:'', files:[], receivedDate:'', dueDate:'', qc:'pending', note:'', createdAt:'', createdTs:0, updatedAt:''};
 }
 function newUid(){ let u; do{ u='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }while(records && records.some(r=>r.uid===u)); return u; }
 /* 舊版（v1）紀錄也能讀：舊編號 COA-001 搬到「文件編號」，儀器名稱不在選單裡的放進「其他」 */
@@ -143,6 +173,7 @@ function migrate(r){
   const o = Object.assign(blankRecord(r.docType), r);
   if(!TYPES[o.docType]) o.docType='coa';
   if(!QC[o.qc]) o.qc='pending';
+  if(!Array.isArray(o.files)) o.files=[];
   if(!o.uid){ o.uid=newUid(); if(!o.docNo && r.id) o.docNo=String(r.id); }
   delete o.id;
   if(o.docType==='cal' && o.item && !instrOf(o.item)){ o.itemOther=o.item; o.item='其他'; }
@@ -192,7 +223,7 @@ function statusBadge(r){ const s=statusOf(r); return `<span class="badge ${s.c}"
 function qcBadge(r){ const c={pending:'q-pending',pass:'q-pass',fail:'q-fail'}[r.qc]; return `<span class="badge ${c}">${QC[r.qc]}</span>`; }
 function autoOf(r){ return r.receivedDate ? addMonths(r.receivedDate,(TYPES[r.docType]||TYPES.coa).months) : ''; }
 
-function leave(){ if(dirty && !confirm('有尚未儲存的修改，確定要離開嗎？')) return false; dirty=false; cur=null; return true; }
+function leave(){ if(dirty && !confirm('有尚未儲存的修改，確定要離開嗎？')) return false; dirty=false; cur=null; cleanupFiles(); return true; }
 
 /* =========================================================
    首頁：三個文件清單
@@ -222,7 +253,7 @@ function showHome(){
           <li>COA、原物料外檢報告、儀器校正外檢報告分成三個清單，點上面的按鈕進入。</li>
           <li>先「新增紀錄」建立應收文件清單；還沒收到文件時，收件日期留空，狀態會顯示「缺件」。</li>
           <li>收到文件後，修改該筆、填上收件日期，「應提供或更新日期」會自動帶出預設值（可自行修改），並由品管人員判定品質確認狀態。</li>
-          <li>「檔案位置」可以寫資料夾路徑，或貼雲端硬碟連結；本工具不存放 PDF 或圖檔本身。</li>
+          <li>每筆紀錄可以加入圖片或 PDF 附件（單檔 20 MB 以內），點縮圖可以打開查看；也可以在「檔案位置」寫資料夾路徑或貼雲端硬碟連結。</li>
           <li>文件收件狀態由日期自動判斷：缺件＝沒有收件日期；需要更新＝進入到期前提示期或品質不合格；尚未更新＝已過到期日；已更新＝其餘。</li>
           <li>預設更新週期與提示期：COA 一年、到期前 3 個月；原物料外檢報告 4 個月、到期前 1 個月；儀器校正外檢報告 一年、到期前 3 個月。</li>
           <li>測試請用假資料，不要輸入真實的供應商機密資料。</li>
@@ -234,9 +265,10 @@ function showHome(){
         <summary>資料保存方式與限制（請務必閱讀）</summary>
         <ul class="small">
           <li><b>本機儲存 · 僅在此裝置此瀏覽器有效 · 可匯出備份。</b>資料存在這台電腦、這個瀏覽器裡，不會上傳，也不會同步到其他電腦或手機。</li>
+          <li>附件（圖片、PDF）一樣只存在這台電腦的這個瀏覽器裡，換電腦或換瀏覽器就看不到。</li>
           <li>換瀏覽器、換電腦、使用無痕視窗，都看不到原本的資料。</li>
-          <li>清除瀏覽資料（勾選「Cookie 和其他網站資料」）會讓全部紀錄消失且無法復原。多人共用這台電腦時，請勿清除瀏覽資料。</li>
-          <li>請定期按「下載備份」，把備份檔放在這台電腦以外的地方（雲端硬碟或寄給自己）。</li>
+          <li>清除瀏覽資料（勾選「Cookie 和其他網站資料」）會讓全部紀錄和附件消失且無法復原。多人共用這台電腦時，請勿清除瀏覽資料。</li>
+          <li>請定期按「下載備份」，把備份檔放在這台電腦以外的地方（雲端硬碟或寄給自己）。備份會包含附件，附件越多備份檔越大。</li>
           <li>「最近刪除」的紀錄保留 30 天，超過的會在「下次打開本工具時」永久刪除（不是準時自動刪除）。</li>
         </ul>
       </details>
@@ -303,7 +335,7 @@ function renderTable(){
   const rs = filteredRecords(), cal = curType==='cal';
   const vis = new Set(rs.map(r=>r.uid)); listSel = new Set([...listSel].filter(id=>vis.has(id)));
   if(!rs.length){ $('#tableBox').innerHTML = `<div class="empty">${ofType(curType).length?'沒有符合條件的紀錄':'目前還沒有紀錄，請按「新增紀錄」開始'}</div>`; return; }
-  const n = listSel.size, clip = r => r.fileLoc ? ' <span title="有檔案位置">📎</span>' : '';
+  const n = listSel.size, clip = r => (r.fileLoc || (r.files||[]).length) ? ' <span title="有附件或檔案位置">📎</span>' : '';
   const no = r => r.docNo ? `<span class="st-sub">${esc(r.docNo)}</span>` : '';
   $('#tableBox').innerHTML = `<div class="row" style="margin-bottom:8px">
       <button class="danger" onclick="listDelete()" ${n?'':'disabled'}>刪除${n?'（'+n+'）':''}</button>
@@ -379,6 +411,10 @@ function renderDetail(){
         <div class="full"><label class="f">檔案位置（資料夾路徑或雲端連結，選填）</label>
           <input type="text" data-f="fileLoc" value="${esc(r.fileLoc)}" placeholder="例：公司共用硬碟／COA／王小明食品行_2026.pdf" oninput="onField(this)">
           <div class="small" style="margin-top:3px"><a id="fileLink" target="_blank" rel="noopener noreferrer">開啟連結 ↗</a></div></div>
+        <div class="full"><label class="f">附件（圖片或 PDF，選填，單檔 20 MB 以內）</label>
+          <input type="file" accept="image/*,application/pdf" multiple onchange="addFiles(this)">
+          <div class="muted small" style="margin-top:3px">附件只存在這台電腦的這個瀏覽器裡</div>
+          <div class="atts" id="atts"></div></div>
       </div>
     </div>
     <div class="card">
@@ -406,8 +442,40 @@ function renderDetail(){
       <span id="dirtyMark"></span><span class="spacer"></span>
       <span class="muted small" id="savedAt">${r.updatedAt?'最後儲存：'+esc(r.updatedAt):'尚未儲存'}</span>
     </div></div>`;
-  refreshForm();
+  refreshForm(); renderAtts();
 }
+async function renderAtts(){
+  const box=$('#atts'); if(!box||!cur) return;
+  attUrls.forEach(u=>URL.revokeObjectURL(u)); attUrls=[];
+  const fs=cur.files||[];
+  if(!fs.length){ box.innerHTML=''; return; }
+  const items=await Promise.all(fs.map(async f=>{ let o=null; try{ o=await fGet(f.id); }catch(e){} return {f,o}; }));
+  if($('#atts')!==box) return;
+  box.innerHTML=items.map(({f,o})=>{
+    let pv='<span title="找不到檔案">⚠️</span>';
+    if(o){ const u=URL.createObjectURL(o.blob); attUrls.push(u);
+      pv=`<a class="pv" href="${u}" target="_blank" rel="noopener">${f.type.startsWith('image/')?`<img src="${u}" alt="">`:'📄'}</a>`; }
+    return `<div class="att">${pv}<span class="nm">${esc(f.name)}<br><span class="muted">${fmtSize(f.size)}</span></span>
+      <button class="danger" onclick="removeAtt('${f.id}')">移除</button></div>`;
+  }).join('');
+}
+async function addFiles(input){
+  const list=[...input.files]; input.value='';
+  for(const file of list){
+    if(!(file.type.startsWith('image/')||file.type==='application/pdf')){ alert(`「${file.name}」不是圖片或 PDF，已略過。`); continue; }
+    if(file.size>MAX_FILE){ alert(`「${file.name}」超過 20 MB，已略過。`); continue; }
+    const meta={id:'f'+newUid().slice(1), name:file.name, type:file.type, size:file.size};
+    try{ await fPut(Object.assign({blob:file, addedAt:new Date().toISOString()},meta)); }
+    catch(e){ alert(`「${file.name}」存不進去，瀏覽器的儲存空間可能已滿。請先「下載備份」，再移除不需要的附件。`); continue; }
+    cur.files.push(meta); dirty=true;
+  }
+  refreshForm(); renderAtts();
+}
+function removeAtt(id){
+  if(!confirm('確定要移除這個附件嗎？（按「儲存」後才會生效）')) return;
+  cur.files=cur.files.filter(f=>f.id!==id); dirty=true; refreshForm(); renderAtts();
+}
+
 function dueError(r){
   if(r.receivedDate && !r.dueDate) return '請填寫應提供或更新日期';
   if(r.receivedDate && r.dueDate && r.dueDate < r.receivedDate) return '應提供或更新日期不能早於收件日期';
@@ -453,7 +521,7 @@ function saveRecord(){
   const backupList=records.slice(), i=records.findIndex(x=>x.uid===r.uid), copy=JSON.parse(JSON.stringify(r));
   if(i>=0) records[i]=copy; else records.push(copy);
   if(!persist()){ records=backupList; if(isNew) r.uid=''; return; }
-  dirty=false;
+  dirty=false; cleanupFiles();
   if(isNew){ showList(); flash('已儲存'); return; }
   $('#savedAt').textContent='最後儲存：'+r.updatedAt; refreshForm(); flash('已儲存');
 }
@@ -507,7 +575,7 @@ function trashPerm(){
   const ids=new Set(trashSel), old=records;
   records=records.filter(r=>!ids.has(r.uid));
   if(!persist()){ records=old; return; }
-  trashSel=new Set(); renderTrash(); flash('已永久刪除 '+n+' 筆');
+  trashSel=new Set(); renderTrash(); cleanupFiles(); flash('已永久刪除 '+n+' 筆');
 }
 function purgeExpired(){
   const exp=records.filter(r=>r.deleted&&r.deletedAt&&today()>addDays(r.deletedAt,30));
@@ -522,35 +590,50 @@ function exportCSV(){
   const rs=filteredRecords(), cal=curType==='cal';
   if(!rs.length){ alert('目前篩選條件下沒有紀錄可匯出。'); return; }
   const head=['文件編號','文件類型', cal?'儀器名稱':'供應商名稱', cal?'校正範圍':'原料或產品名稱', ...(cal?['校正公司']:[]),
-    '收件日期','應提供或更新日期','文件收件狀態','狀態說明','品質確認狀態','檔案位置','備註','最後儲存'];
+    '收件日期','應提供或更新日期','文件收件狀態','狀態說明','品質確認狀態','檔案位置','附件數','備註','最後儲存'];
   const rows=rs.map(r=>{ const s=statusOf(r);
     return [r.docNo,TYPES[r.docType].name, cal?itemLabel(r):r.supplier, cal?rangeText(r):r.item, ...(cal?[r.supplier]:[]),
-      r.receivedDate,r.dueDate,s.t,s.extra||'',QC[r.qc],r.fileLoc,r.note,r.updatedAt]; });
+      r.receivedDate,r.dueDate,s.t,s.extra||'',QC[r.qc],r.fileLoc,(r.files||[]).length,r.note,r.updatedAt]; });
   const csv=[head,...rows].map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
   download('﻿'+csv, `${curType}_report_${today()}.csv`, 'text/csv;charset=utf-8');
 }
-function backup(){
-  download(JSON.stringify({app:'casevoraCoaTracker', version:2, exportedAt:new Date().toISOString(), records:live()},null,1),
+async function backup(){
+  const rs=live(), ids=new Set(rs.flatMap(r=>r.files.map(f=>f.id)));
+  let files=[];
+  try{
+    if(ids.size) flash('正在準備備份（含附件）…');
+    for(const o of (await fAll()).filter(o=>ids.has(o.id)))
+      files.push({id:o.id, name:o.name, type:o.type, size:o.size, addedAt:o.addedAt, data:await blobToDataUrl(o.blob)});
+  }catch(e){ if(!confirm('附件讀取失敗，要只備份文字紀錄（不含附件）嗎？')) return; files=[]; }
+  download(JSON.stringify({app:'casevoraCoaTracker', version:3, exportedAt:new Date().toISOString(), records:rs, files},null,1),
     `coa_backup_${today()}.json`, 'application/json');
 }
 function restore(input){
   const file=input.files[0]; input.value=''; if(!file) return;
   const fr=new FileReader();
-  fr.onload=()=>{
+  fr.onload=async ()=>{
     let data;
     try{ data=JSON.parse(fr.result); if(!data || data.app!=='casevoraCoaTracker' || !Array.isArray(data.records)) throw 0; }
     catch(e){ alert('無法讀取：這不是本工具的備份檔。'); return; }
     const trashN=records.filter(r=>r.deleted).length;
     if(!confirm(`備份檔內有 ${data.records.length} 筆紀錄。\n還原會「取代」目前瀏覽器中的 ${live().length} 筆資料，目前「最近刪除」裡的 ${trashN} 筆也會一併被取代，確定嗎？`)) return;
     const old=records, seen=new Set();
+    const files=(Array.isArray(data.files)?data.files:[]).filter(f=>f&&f.id&&typeof f.data==='string'&&f.data.startsWith('data:'));
+    const avail=new Set(files.map(f=>f.id));
     records=[];
     data.records.filter(r=>r&&typeof r==='object').forEach(r=>{
       const o=migrate(Object.assign({},r,{deleted:false}));
       if(seen.has(o.uid)) o.uid=newUid();
+      o.files=o.files.filter(f=>f&&avail.has(f.id));
       seen.add(o.uid); records.push(o);
     });
+    try{
+      const blobs=await Promise.all(files.map(async f=>({id:f.id, name:String(f.name||''), type:String(f.type||''), size:+f.size||0, addedAt:f.addedAt, blob:await (await fetch(f.data)).blob()})));
+      await fClear();
+      if(blobs.length) await fx('readwrite', st=>{ blobs.forEach(b=>st.put(b)); });
+    }catch(e){ records=old; alert('還原附件失敗，資料沒有變動。瀏覽器的儲存空間可能不夠。'); return; }
     if(!persist()){ records=old; return; }
-    dirty=false; flash('還原完成'); showHome();
+    dirty=false; cur=null; flash('還原完成'); showHome();
   };
   fr.readAsText(file);
 }
@@ -558,7 +641,8 @@ function restore(input){
 (function init(){
   try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); }
   catch(e){ alert('注意：目前瀏覽器無法保存資料（可能是無痕模式或已封鎖網站資料），關閉後資料會遺失。'); }
-  purgeExpired(); showHome();
+  try{ navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(()=>{}); }catch(e){}
+  purgeExpired(); cleanupFiles(); showHome();
 })();
 </script>
 </body>
