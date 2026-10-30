@@ -509,7 +509,8 @@ function filteredRecords(){
     if(!inTab(r,listTab)) return false;
     if(listStatus && statusOf(r).k!==listStatus) return false;
     if(listCat && curType!=='cal' && r.category!==listCat) return false;
-    if(q){ const hay=[r.docNo,r.supplier,itemLabel(r),rangeText(r),r.category,r.testItems,r.testReq,r.note].join(' ').toLowerCase(); if(!hay.includes(q)) return false; }
+    /* 文字搜尋只看清單上看得到的欄位 */
+    if(q){ const hay=(curType==='cal' ? [r.docNo,itemLabel(r),rangeText(r),r.supplier] : [r.docNo,r.supplier,r.item,r.category]).join(' ').toLowerCase(); if(!hay.includes(q)) return false; }
     return true;
   }).sort((a,b)=>{
     const sa=statusOf(a), sb=statusOf(b);
@@ -535,7 +536,7 @@ function showList(type){
         ${TABS.map(([k,n])=>`<button class="${listTab===k?'on':''}" onclick="listTab='${k}';listPage=1;showList()">${n}（${cnt[k]}）</button>`).join('')}
       </div>
       <div class="row" style="margin-bottom:12px">
-        <input type="text" class="lsearch" placeholder="搜尋${curType==='cal'?'儀器、校正公司':'供應商、原料／產品'}、編號…" style="max-width:360px" value="${esc(listSearch)}" oninput="listSearch=this.value;listPage=1;listSel=new Set();renderTable()">
+        <input type="text" class="lsearch" placeholder="搜尋 ${curType==='cal'?'儀器／校正範圍／校正公司':'供應商／原料／分類'}／編號" style="max-width:360px" value="${esc(listSearch)}" oninput="listSearch=this.value;listPage=1;listSel=new Set();renderTable()">
         <select class="lsel" style="width:auto" onchange="listStatus=this.value;listPage=1;listSel=new Set();renderTable()">
           <option value="">全部文件狀態</option>
           ${[['missing','缺件'],['ok','已更新'],['need','需要更新'],['late','尚未更新']].map(([k,n])=>`<option value="${k}" ${listStatus===k?'selected':''}>${n}</option>`).join('')}
