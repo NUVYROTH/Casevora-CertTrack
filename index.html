@@ -147,6 +147,16 @@ details summary{cursor:pointer;font-weight:700}
 .q-pass{background:#e6f5ec;color:#0f5a2d}
 .q-fail{background:#fdecea;color:#7d1a12}
 .st-sub{display:block;font-size:12px;color:var(--muted);margin-top:2px}
+.modal{position:fixed;inset:0;background:rgba(22,33,58,.45);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px}
+.modal .box{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:10px;max-width:440px;width:100%;padding:18px 20px;box-shadow:0 8px 30px rgba(0,0,0,.25)}
+.modal .msg{white-space:pre-wrap;margin-bottom:14px}
+.modal .row{justify-content:flex-end}
+.selall{display:inline-flex;align-items:center;gap:6px;font-size:14px}
+.selall input,td input[type=checkbox]{width:18px;height:18px;accent-color:var(--brand)}
+.lcount{font-size:13px;color:var(--muted);margin-bottom:6px}
+.pager{margin-top:12px}
+td.ac{white-space:nowrap}
+td.ac button{padding:4px 10px;font-size:13px}
 .range{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .range input[type=text]{width:110px}
 .range select{width:auto}
@@ -240,6 +250,9 @@ records = loadAll();
 let view = 'home', curType = 'coa';
 let cur = null, dirty = false;
 let listTab = 'todo', listSearch = '', listStatus = '', listCat = '';
+const PAGE_SIZES = [20,30,50,100];
+let listPage = 1, pageSize = 20;
+try{ const ps=parseInt(localStorage.getItem('casevoraCoaTracker_pageSize'),10); if(PAGE_SIZES.includes(ps)) pageSize=ps; }catch(e){}
 let listSel = new Set(), trashSel = new Set();
 const live = () => records.filter(r=>!r.deleted);
 const ofType = t => live().filter(r=>r.docType===t);
@@ -253,6 +266,19 @@ function addDays(ymd,n){ const [y,m,d]=ymd.split('-').map(Number); const t=new D
 function addMonths(ymd,n){ const [y,m,d]=ymd.split('-').map(Number); const t=new Date(y,m-1+n,1); const last=new Date(t.getFullYear(),t.getMonth()+1,0).getDate(); return t.getFullYear()+'-'+p2(t.getMonth()+1)+'-'+p2(Math.min(d,last)); }
 function daysBetween(a,b){ const [y1,m1,d1]=a.split('-').map(Number), [y2,m2,d2]=b.split('-').map(Number); return Math.round((new Date(y2,m2-1,d2)-new Date(y1,m1-1,d1))/86400000); }
 function fmtDate(s){ if(!s) return ''; const [y,m,d]=s.split('-'); return `${y}/${m}/${d}`; }
+/* 頁面內的確認視窗（與 Casevoras 其他工具一致） */
+function dialog(msg, okText, cancelText){
+  return new Promise(res => {
+    const m = document.createElement('div'); m.className = 'modal';
+    m.innerHTML = `<div class="box" role="dialog" aria-modal="true"><div class="msg"></div><div class="row">${cancelText?`<button id="dlgNo">${cancelText}</button>`:''}<button class="primary" id="dlgYes">${okText}</button></div></div>`;
+    m.querySelector('.msg').textContent = msg;
+    const done = v => { m.remove(); res(v); };
+    m.querySelector('#dlgYes').onclick = () => done(true);
+    if(cancelText) m.querySelector('#dlgNo').onclick = () => done(false);
+    document.body.appendChild(m); m.querySelector('#dlgYes').focus();
+  });
+}
+const ask = msg => dialog(msg, '確定', '取消');
 function flash(t){
   const d = document.createElement('div'); d.textContent = t;
   d.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1f6f5c;color:#fff;padding:8px 20px;border-radius:6px;z-index:99;box-shadow:0 2px 8px rgba(0,0,0,.2)';
@@ -494,7 +520,7 @@ function filteredRecords(){
 }
 function showList(type){
   if(!leave()) return;
-  if(type && type!==curType){ curType=type; listTab='todo'; listSearch=''; listStatus=''; listCat=''; }
+  if(type && type!==curType){ curType=type; listTab='todo'; listSearch=''; listStatus=''; listCat=''; listPage=1; }
   view='list'; listSel=new Set(); setSide(curType);
   const t=TYPES[curType], cnt={}; TABS.forEach(([k])=>cnt[k]=ofType(curType).filter(r=>inTab(r,k)).length);
   $('#app').innerHTML = `
@@ -506,15 +532,15 @@ function showList(type){
     <div class="card">
       <div class="phd"><b>${t.name}清單</b></div>
       <div class="row tabs" style="margin-bottom:12px">
-        ${TABS.map(([k,n])=>`<button class="${listTab===k?'on':''}" onclick="listTab='${k}';showList()">${n}（${cnt[k]}）</button>`).join('')}
+        ${TABS.map(([k,n])=>`<button class="${listTab===k?'on':''}" onclick="listTab='${k}';listPage=1;showList()">${n}（${cnt[k]}）</button>`).join('')}
       </div>
       <div class="row" style="margin-bottom:12px">
-        <input type="text" class="lsearch" placeholder="搜尋${curType==='cal'?'儀器、校正公司':'供應商、原料／產品'}、編號…" style="max-width:360px" value="${esc(listSearch)}" oninput="listSearch=this.value;renderTable()">
-        <select class="lsel" style="width:auto" onchange="listStatus=this.value;renderTable()">
+        <input type="text" class="lsearch" placeholder="搜尋${curType==='cal'?'儀器、校正公司':'供應商、原料／產品'}、編號…" style="max-width:360px" value="${esc(listSearch)}" oninput="listSearch=this.value;listPage=1;listSel=new Set();renderTable()">
+        <select class="lsel" style="width:auto" onchange="listStatus=this.value;listPage=1;listSel=new Set();renderTable()">
           <option value="">全部文件狀態</option>
           ${[['missing','缺件'],['ok','已更新'],['need','需要更新'],['late','尚未更新']].map(([k,n])=>`<option value="${k}" ${listStatus===k?'selected':''}>${n}</option>`).join('')}
         </select>
-        ${curType==='cal'?'':`<select class="lsel" style="width:auto" onchange="listCat=this.value;renderTable()">
+        ${curType==='cal'?'':`<select class="lsel" style="width:auto" onchange="listCat=this.value;listPage=1;listSel=new Set();renderTable()">
           <option value="">全部原料分類</option>${CATS.map(c=>`<option ${listCat===c?'selected':''}>${c}</option>`).join('')}</select>`}
       </div>
       <div id="tableBox"></div>
@@ -522,32 +548,64 @@ function showList(type){
   renderTable(); window.scrollTo(0,0);
 }
 function renderTable(){
-  const rs = filteredRecords(), cal = curType==='cal';
+  const all = filteredRecords(), cal = curType==='cal';
+  const pages = Math.max(1, Math.ceil(all.length/pageSize));
+  if(listPage>pages) listPage=pages; if(listPage<1) listPage=1;
+  const rs = all.slice((listPage-1)*pageSize, listPage*pageSize);
   const vis = new Set(rs.map(r=>r.uid)); listSel = new Set([...listSel].filter(id=>vis.has(id)));
-  if(!rs.length){ $('#tableBox').innerHTML = `<div class="empty">${ofType(curType).length?'沒有符合條件的紀錄':'目前還沒有紀錄，請按「新增紀錄」開始'}</div>`; return; }
-  const n = listSel.size, clip = r => (r.files||[]).length ? ' <span title="有附件">📎</span>' : '';
+  if(!rs.length){ $('#tableBox').innerHTML = `<div class="lcount">共 0 件</div><div class="empty">${ofType(curType).length?'沒有符合條件的紀錄':'目前還沒有紀錄，請按「新增紀錄」開始'}</div>`; return; }
+  const n = listSel.size, allOn = rs.every(r=>listSel.has(r.uid)), clip = r => (r.files||[]).length ? ' <span title="有附件">📎</span>' : '';
   const no = r => r.docNo ? `<span class="st-sub">${esc(r.docNo)}</span>` : '';
-  $('#tableBox').innerHTML = `<div class="row" style="margin-bottom:8px">
-      <button class="danger" onclick="listDelete()" ${n?'':'disabled'}>刪除${n?'（'+n+'）':''}</button>
-      <span class="muted small">${n?'已勾選 '+n+' 筆':'勾選紀錄後可刪除'}</span></div>
+  $('#tableBox').innerHTML = `<div class="lcount">共 ${all.length} 件</div><div class="row" style="margin-bottom:8px">
+      <label class="selall"><input type="checkbox" ${allOn?'checked':''} onchange="listAll(this.checked)">全選本頁</label>
+      <button class="danger" onclick="listDelete()" ${n?'':'disabled'}>刪除${n?'（'+n+'）':''}</button></div>
+    <div class="muted small" style="margin-bottom:8px">${n?'已勾選 '+n+' 筆':'勾選紀錄後可一次刪除；也可以按每一列右邊的「刪除」'}</div>
     <div style="overflow-x:auto"><table>
     <thead><tr><th></th>${cal
       ? '<th>儀器名稱</th><th>文件狀態</th><th>校正範圍</th><th>校正公司</th>'
-      : '<th>供應商</th><th>文件狀態</th><th>原料或產品</th>'}<th>收件日期</th><th>應提供或更新日期</th><th>品質確認</th></tr></thead>
+      : '<th>供應商</th><th>文件狀態</th><th>原料或產品</th>'}<th>收件日期</th><th>應提供或更新日期</th><th>品質確認</th><th></th></tr></thead>
     <tbody>${rs.map(r=>`<tr class="click" onclick="openRecord('${r.uid}')">
-      <td onclick="event.stopPropagation()"><input type="checkbox" data-id="${esc(r.uid)}" ${listSel.has(r.uid)?'checked':''} onchange="listToggle(this)"></td>
+      <td onclick="event.stopPropagation()"><input type="checkbox" data-id="${esc(r.uid)}" ${listSel.has(r.uid)?'checked':''} onchange="listToggle(this)" aria-label="勾選"></td>
       ${cal
         ? `<td>${esc(itemLabel(r))}${clip(r)}${no(r)}</td><td>${statusBadge(r)}</td><td>${esc(rangeText(r))||'—'}</td><td>${esc(r.supplier)}</td>`
         : `<td>${esc(r.supplier)}${clip(r)}${no(r)}</td><td>${statusBadge(r)}</td><td>${esc(r.item)}${r.category?`<span class="st-sub">${esc(r.category)}</span>`:''}</td>`}
       <td class="nw">${r.receivedDate?fmtDate(r.receivedDate):'—'}</td><td class="nw">${r.dueDate?fmtDate(r.dueDate):'—'}</td>
-      <td>${qcBadge(r)}</td></tr>`).join('')}
-    </tbody></table></div>`;
+      <td>${qcBadge(r)}</td>
+      <td class="ac" onclick="event.stopPropagation()"><button onclick="openRecord('${r.uid}')">編輯</button> <button onclick="deleteOne('${r.uid}')">刪除</button></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="row pager">
+      <button onclick="goPage(-1)" ${listPage<=1?'disabled':''}>上一頁</button>
+      <span class="small">第 ${listPage}／${pages} 頁（共 ${all.length} 件）</span>
+      <button onclick="goPage(1)" ${listPage>=pages?'disabled':''}>下一頁</button>
+      <span class="spacer"></span>
+      <label class="small muted">每頁
+        <select style="width:auto" onchange="setPageSize(this.value)">${PAGE_SIZES.map(x=>`<option value="${x}" ${x===pageSize?'selected':''}>${x}</option>`).join('')}</select> 件</label>
+    </div>`;
+}
+/* 換頁時，勾選會自動取消（避免刪除看不到的紀錄） */
+function goPage(d){ listPage+=d; listSel=new Set(); renderTable(); }
+function setPageSize(v){
+  pageSize=parseInt(v,10)||20; listPage=1; listSel=new Set();
+  try{ localStorage.setItem('casevoraCoaTracker_pageSize', String(pageSize)); }catch(e){}
+  renderTable();
+}
+function listAll(on){
+  const all=filteredRecords();
+  all.slice((listPage-1)*pageSize, listPage*pageSize).forEach(r=>on?listSel.add(r.uid):listSel.delete(r.uid));
+  renderTable();
 }
 function listToggle(el){ const id=el.dataset.id; if(el.checked) listSel.add(id); else listSel.delete(id); renderTable(); }
-function listDelete(){
+async function deleteOne(uid){
+  const r=records.find(x=>x.uid===uid); if(!r||r.deleted) return;
+  if(!(await ask('確定要刪除嗎？'))) return;
+  r.deleted=true; r.deletedAt=today();
+  if(!persist()){ r.deleted=false; delete r.deletedAt; return; }
+  listSel.delete(uid); showList(); flash('已移到「最近刪除」');
+}
+async function listDelete(){
   const ids=[...listSel].filter(id=>{ const r=records.find(x=>x.uid===id); return r && !r.deleted; });
   if(!ids.length) return;
-  if(!confirm(`確定要刪除選取的 ${ids.length} 筆嗎？`)) return;
+  if(!(await ask(`確定要刪除選取的 ${ids.length} 筆嗎？`))) return;
   const done=[]; records.forEach(r=>{ if(ids.includes(r.uid)){ r.deleted=true; r.deletedAt=today(); done.push(r); } });
   if(!persist()){ done.forEach(r=>{ r.deleted=false; delete r.deletedAt; }); return; }
   listSel=new Set(); showList(); flash('已移到「最近刪除」（'+done.length+' 筆）');
@@ -727,8 +785,8 @@ function saveRecord(){
   if(isNew){ showList(); flash('已儲存'); return; }
   $('#savedAt').textContent='最後儲存：'+r.updatedAt; refreshForm(); flash('已儲存');
 }
-function deleteRecord(){
-  if(!confirm('確定要刪除嗎？')) return;
+async function deleteRecord(){
+  if(!(await ask('確定要刪除嗎？'))) return;
   const rec=records.find(x=>x.uid===cur.uid); if(!rec) return;
   rec.deleted=true; rec.deletedAt=today();
   if(!persist()){ rec.deleted=false; delete rec.deletedAt; return; }
@@ -741,12 +799,16 @@ window.addEventListener('beforeunload', e=>{ if(dirty){ e.preventDefault(); e.re
    ========================================================= */
 function trashList(){ return records.filter(r=>r.deleted).sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||'')||(b.createdTs||0)-(a.createdTs||0)); }
 function daysLeft(r){ return 30-daysBetween(r.deletedAt||today(),today()); }
-function showTrash(){ if(!leave()) return; view='trash'; setSide('trash'); trashSel=new Set(); renderTrash(); window.scrollTo(0,0); }
+let trashBack='';
+function showTrash(){ if(!leave()) return; trashBack = view==='list' ? curType : ''; view='trash'; setSide('trash'); trashSel=new Set(); renderTrash(); window.scrollTo(0,0); }
 function renderTrash(){
   const rs=trashList(), n=trashSel.size;
   $('#app').innerHTML = `
-    ${crumbHTML('<b>最近刪除</b>')}
-    <div class="ptitle" style="margin-bottom:12px"><h1>最近刪除</h1><div class="eyebrow">RECENTLY DELETED</div></div>
+    <div class="hcard">
+      <div class="hc-top"><div class="ptitle"><h1>最近刪除</h1><div class="eyebrow">RECENTLY DELETED</div></div><span class="lbadge">● 本機資料模式</span></div>
+      <div class="hc-bot" style="margin-top:0"><div class="hcrumb">Casevoras / <b>最近刪除</b></div>
+        <div class="ptools"><button class="lite" onclick="${view==='trash'&&trashBack?`showList('${trashBack}')`:'showHome()'}">← 返回清單</button></div></div>
+    </div>
     <div class="card">
       <div class="notice info small">已刪除超過 30 天的紀錄，會在下次打開本工具時永久刪除。</div>
       <div class="row" style="margin:8px 0">
@@ -772,9 +834,9 @@ function trashRestore(){
   if(!persist()){ done.forEach(r=>{ r.deleted=true; r.deletedAt=today(); }); return; }
   trashSel=new Set(); renderTrash(); flash('已還原 '+done.length+' 筆');
 }
-function trashPerm(){
+async function trashPerm(){
   const n=trashSel.size; if(!n) return;
-  if(!confirm(`確定要永久刪除選取的 ${n} 筆嗎？永久刪除後無法復原。`)) return;
+  if(!(await ask(`確定要永久刪除選取的 ${n} 筆嗎？永久刪除後無法復原。`))) return;
   const ids=new Set(trashSel), old=records;
   records=records.filter(r=>!ids.has(r.uid));
   if(!persist()){ records=old; return; }
