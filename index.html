@@ -214,6 +214,7 @@ td.ac button{padding:4px 10px;font-size:13px}
     <button data-v="coa" onclick="showList('coa')"><span class="ic">📄</span>廠商COA報告</button>
     <button data-v="raw" onclick="showList('raw')"><span class="ic">🧪</span>原物料外檢報告</button>
     <button data-v="cal" onclick="showList('cal')"><span class="ic">⚖️</span>儀器校正外檢報告</button>
+    <button data-v="contacts" onclick="showContacts()"><span class="ic">📇</span>聯絡清單</button>
     <button data-v="trash" onclick="showTrash()"><span class="ic">🗑️</span>最近刪除</button>
     <span class="spacer"></span>
     <button data-v="help" onclick="openGuide()"><span class="ic">?</span>使用說明</button>
@@ -223,8 +224,10 @@ td.ac button{padding:4px 10px;font-size:13px}
 </div></main>
 <input type="file" id="restoreFile" accept=".json" hidden onchange="restore(this)">
 <input type="file" id="xlsxFile" accept=".xlsx" hidden onchange="importXlsx(this)">
+<input type="file" id="ctFile" accept=".xlsx" hidden onchange="importContacts(this)">
 <script>
 const KEY = 'casevoraCoaTracker_v2';
+const KEY_C = 'casevoraCoaTracker_contacts_v1';
 const OLD_KEY = 'casevoraCoaTracker_v1';
 const TYPES = {
   coa: {name:'廠商COA報告',       months:12, lead:3, per:'1y', sup:'供應商名稱', item:'原料或產品名稱', ic:'📄',
@@ -928,7 +931,8 @@ function exportXlsx(){
     [], [{v:`匯出時間：${new Date().toLocaleString('zh-TW')}`,s:2}], [{v:'本機儲存 · 僅在此裝置此瀏覽器有效；此檔案為匯出當下的資料',s:2}]];
   const sheets=[['摘要', sheetXml('摘要',sumHead,sumRows,[22,10,18,10,12,10,12,13,10],false)],
     ['總表', sheetXml('總表',COLS.all.h,sortForReport(L).map(r=>recRow(r,COLS.all.k)),COLS.all.w)],
-    ...Object.entries(TYPES).map(([k,t])=>{ const c=k==='cal'?COLS.cal:COLS.doc; return [t.name, sheetXml(t.name,c.h,sortForReport(ofType(k)).map(r=>recRow(r,c.k)),c.w)]; })];
+    ...Object.entries(TYPES).map(([k,t])=>{ const c=k==='cal'?COLS.cal:COLS.doc; return [t.name, sheetXml(t.name,c.h,sortForReport(ofType(k)).map(r=>recRow(r,c.k)),c.w)]; }),
+    ...(contacts.length?[['聯絡清單', sheetXml('聯絡清單',['代碼','供應商','品項','公司電話','檢驗報告','備註'],contacts.map(c=>[c.code,c.supplier,c.items,c.phone,c.report,c.note]),[12,22,30,16,24,30])]]:[])];
   const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`
     +`<fonts count="7"><font><sz val="11"/><name val="Microsoft JhengHei"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Microsoft JhengHei"/></font>`
     +`<font><b/><sz val="11"/><color rgb="FF7D1A12"/><name val="Microsoft JhengHei"/></font><font><b/><sz val="11"/><color rgb="FF7A3D06"/><name val="Microsoft JhengHei"/></font>`
@@ -1123,6 +1127,103 @@ function confirmImport(){
   if(!persist()){ records=old; return; }
   pendingImport=null; showHome(); flash(`已匯入 ${P.recs.length} 筆`);
 }
+/* =========================================================
+   聯絡清單：只放公司層級資料（代碼、供應商、品項、公司電話、檢驗報告）
+   個人姓名與手機：等安安判斷前不收，輸入或匯入時會擋下
+   ========================================================= */
+let contacts = loadContacts(), ctCur = null, ctSearch = '';
+function ctMigrate(c){ return Object.assign({uid:'', code:'', supplier:'', items:'', phone:'', report:'', note:'', importKey:''}, c, {uid:c.uid||('c'+newUid().slice(1))}); }
+function loadContacts(){ try{ return (JSON.parse(localStorage.getItem(KEY_C))||[]).map(ctMigrate); }catch(e){ return []; } }
+function persistContacts(){ try{ localStorage.setItem(KEY_C, JSON.stringify(contacts)); return true; }catch(e){ alert('儲存失敗！瀏覽器的儲存空間可能已滿。'); return false; } }
+const MOBILE = /09\d{2}[-\s]?\d{3}[-\s]?\d{3}/;
+const PERSONAL_NOTE = '此頁只放公司資料。個人姓名與手機要等安安判斷後才能放，輸入或匯入時會自動擋下。';
+function showContacts(){
+  if(!leave()) return;
+  view='contacts'; ctCur=null; setSide('contacts');
+  $('#app').innerHTML = `
+    ${headHTML('聯絡清單','SUPPLIER CONTACTS','供應商代碼、品項、公司電話與檢驗報告。','聯絡清單',
+      `<button class="primary pnew" onclick="editContact()">＋ 新增聯絡資料</button>
+       <button class="lite" onclick="$('#ctFile').click()" title="從供應商資訊（.xlsx）匯入">從 Excel 匯入</button>${backupTools()}`)}
+    <div class="notice info small">${PERSONAL_NOTE}</div>
+    <div class="card">
+      <div class="phd"><b>聯絡清單</b></div>
+      <input type="text" class="lsearch" placeholder="搜尋 代碼／供應商／品項" style="max-width:360px;margin-bottom:12px" value="${esc(ctSearch)}" oninput="ctSearch=this.value;renderContacts()">
+      <div id="ctBox"></div>
+    </div>`;
+  renderContacts(); window.scrollTo(0,0);
+}
+function renderContacts(){
+  const q=ctSearch.trim().toLowerCase();
+  const rs=contacts.filter(c=>!q||[c.code,c.supplier,c.items].join(' ').toLowerCase().includes(q));
+  $('#ctBox').innerHTML = `<div class="lcount">共 ${rs.length} 筆</div>` + (rs.length ? `<div style="overflow-x:auto"><table>
+    <thead><tr><th>代碼</th><th>供應商</th><th>品項</th><th>公司電話</th><th>檢驗報告</th><th></th></tr></thead>
+    <tbody>${rs.map(c=>`<tr class="click" onclick="editContact('${c.uid}')"><td class="nw">${esc(c.code)||'—'}</td><td>${esc(c.supplier)||'—'}</td>
+      <td>${esc(c.items).replace(/\n/g,'<br>')||'—'}</td><td class="nw">${esc(c.phone)||'—'}</td><td>${esc(c.report)||'—'}</td>
+      <td class="ac" onclick="event.stopPropagation()"><button onclick="editContact('${c.uid}')">編輯</button> <button onclick="deleteContact('${c.uid}')">刪除</button></td></tr>`).join('')}
+    </tbody></table></div>` : `<div class="empty">${contacts.length?'沒有符合條件的資料':'目前還沒有資料，請按「新增聯絡資料」或「從 Excel 匯入」'}</div>`);
+}
+function editContact(uid){
+  const c=uid?contacts.find(x=>x.uid===uid):null; if(uid&&!c) return;
+  ctCur=JSON.parse(JSON.stringify(c||ctMigrate({}))); if(!c) ctCur.uid='';
+  view='contact'; setSide('contacts');
+  const f=(k,l,ph,ta)=>`<div class="${ta?'full':''}"><label class="f">${l}</label>${ta
+    ?`<textarea data-k="${k}" placeholder="${ph}" oninput="ctCur.${k}=this.value;dirty=true">${esc(ctCur[k])}</textarea>`
+    :`<input type="text" data-k="${k}" placeholder="${ph}" value="${esc(ctCur[k])}" oninput="ctCur.${k}=this.value;dirty=true">`}</div>`;
+  $('#app').innerHTML = `
+    ${crumbHTML(`聯絡清單 / <b>${uid?'編輯':'新增'}</b>`)}
+    <div class="row" style="margin-bottom:12px"><button onclick="showContacts()">← 返回聯絡清單</button>
+      <h2 style="margin:0 8px;font-size:18px">${uid?esc(ctCur.supplier||'聯絡資料'):'新增聯絡資料'}</h2></div>
+    <div class="notice info small">${PERSONAL_NOTE}</div>
+    <div class="card"><div class="grid">
+      ${f('code','代碼','例：A0101')}${f('supplier','供應商 *','例：王小明食品行')}${f('phone','公司電話','例：02-1234-5678（總機或市話）')}
+      ${f('items','品項','可以寫多項，一行一項',1)}${f('report','檢驗報告','例：每年一次、隨貨')}${f('note','備註','',1)}
+    </div></div>
+    <div class="savebar"><div class="in"><button class="primary" onclick="saveContact()">儲存</button><button onclick="showContacts()">返回清單</button></div></div>`;
+  dirty=false; window.scrollTo(0,0);
+}
+function saveContact(){
+  const c=ctCur; ['code','supplier','items','phone','report','note'].forEach(k=>c[k]=str(c[k]));
+  if(!c.supplier){ alert('請先填寫：供應商'); return; }
+  const bad=['items','phone','report','note'].filter(k=>MOBILE.test(c[k]));
+  if(bad.length){ alert('偵測到手機號碼。\n個人手機要等安安判斷後才能放，請改填公司電話（總機或市話），或先拿掉。'); return; }
+  const old=contacts.slice();
+  if(c.uid){ const i=contacts.findIndex(x=>x.uid===c.uid); contacts[i]=c; } else { c.uid='c'+newUid().slice(1); contacts.push(c); }
+  if(!persistContacts()){ contacts=old; return; }
+  dirty=false; showContacts(); flash('已儲存');
+}
+async function deleteContact(uid){
+  const c=contacts.find(x=>x.uid===uid); if(!c) return;
+  if(!(await ask(`確定要刪除「${c.supplier||c.code}」嗎？\n聯絡清單刪除後無法復原（可用備份還原）。`))) return;
+  const old=contacts.slice(); contacts=contacts.filter(x=>x.uid!==uid);
+  if(!persistContacts()){ contacts=old; return; }
+  renderContacts(); flash('已刪除');
+}
+async function importContacts(input){
+  const file=input.files[0]; input.value=''; if(!file) return;
+  if(!leave()) return;
+  if(typeof DecompressionStream==='undefined'){ alert('這個瀏覽器版本太舊，無法讀取 Excel。請更新 Chrome 或 Edge 後再試。'); return; }
+  let sheets; try{ sheets=await readXlsx(file); }catch(e){ alert('無法讀取：請確認是 .xlsx 格式的 Excel 檔。'); return; }
+  const sh=sheets.find(x=>{ const h=(x.rows[0]||[]).map(str); return h.includes('供應商')&&h.includes('代碼'); });
+  if(!sh){ alert('找不到聯絡清單：需要有「代碼」和「供應商」欄位的工作表。'); return; }
+  const h=(sh.rows[0]||[]).map(str), ix=n=>h.indexOf(n), iC=ix('代碼'), iS=ix('供應商'), iI=ix('品項'), iP=h.findIndex(x=>x==='連絡電話'||x==='聯絡電話'||x==='電話'), iR=ix('檢驗報告');
+  const keys=new Set(contacts.map(c=>c.importKey).filter(Boolean)), add=[], blocked=[]; let dup=0;
+  for(let ri=1; ri<sh.rows.length; ri++){
+    const row=sh.rows[ri]||[], g=i=>i<0?'':str(row[i]);
+    const c={code:g(iC), supplier:g(iS), items:g(iI), phone:g(iP), report:g(iR)};
+    if(!c.code&&!c.supplier&&!c.items) continue;
+    ['items','phone','report'].forEach(k=>{ if(MOBILE.test(c[k])){ c[k]=''; blocked.push(`第 ${ri+1} 列`); } });
+    const key=`${sh.name}#${ri+1}`; if(keys.has(key)){ dup++; continue; }
+    add.push(ctMigrate(Object.assign(c,{uid:'', importKey:key})));
+  }
+  if(!add.length){ alert(dup?'這份檔案的聯絡資料之前都已經匯入過了。':'找不到可以匯入的聯絡資料。'); return; }
+  const msg=`工作表「${sh.name}」\n預計匯入 ${add.length} 筆（加在原本資料後面）。`
+    +(blocked.length?`\n\n有 ${blocked.length} 格含手機號碼，已整格略過：${[...new Set(blocked)].join('、')}。\n個人手機要等安安判斷後才能放。`:'')
+    +(dup?`\n\n有 ${dup} 筆之前已匯入，這次略過。`:'')+'\n\n確定匯入嗎？';
+  if(!(await ask(msg))) return;
+  const old=contacts.slice(); add.forEach(c=>{ c.uid='c'+newUid().slice(1); contacts.push(c); });
+  if(!persistContacts()){ contacts=old; return; }
+  showContacts(); flash(`已匯入 ${add.length} 筆聯絡資料`);
+}
 async function backup(){
   const rs=live(), ids=new Set(rs.flatMap(r=>r.files.map(f=>f.id)));
   let files=[];
@@ -1131,7 +1232,7 @@ async function backup(){
     for(const o of (await fAll()).filter(o=>ids.has(o.id)))
       files.push({id:o.id, name:o.name, type:o.type, size:o.size, addedAt:o.addedAt, data:await blobToDataUrl(o.blob)});
   }catch(e){ if(!confirm('附件讀取失敗，要只備份文字紀錄（不含附件）嗎？')) return; files=[]; }
-  download(JSON.stringify({app:'casevoraCoaTracker', version:3, exportedAt:new Date().toISOString(), records:rs, files},null,1),
+  download(JSON.stringify({app:'casevoraCoaTracker', version:3, exportedAt:new Date().toISOString(), records:rs, files, contacts},null,1),
     `coa_backup_${today()}.json`, 'application/json');
 }
 function restore(input){
@@ -1159,6 +1260,7 @@ function restore(input){
       if(blobs.length) await fx('readwrite', st=>{ blobs.forEach(b=>st.put(b)); });
     }catch(e){ records=old; alert('還原附件失敗，資料沒有變動。瀏覽器的儲存空間可能不夠。'); return; }
     if(!persist()){ records=old; return; }
+    if(Array.isArray(data.contacts)){ contacts=data.contacts.filter(c=>c&&typeof c==='object').map(ctMigrate); persistContacts(); }
     dirty=false; cur=null; flash('還原完成'); showHome();
   };
   fr.readAsText(file);
