@@ -161,6 +161,17 @@ details summary{cursor:pointer;font-weight:700}
 .pager{margin-top:12px}
 td.ac{white-space:nowrap}
 td.ac button{padding:4px 10px;font-size:13px}
+.gstep{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:18px;align-items:start}
+.gstep img{width:100%;border:1px solid var(--line);border-radius:8px;display:block;box-shadow:0 1px 4px rgba(22,33,58,.08)}
+.gstep img+img{margin-top:10px}
+.gstep ol{margin:0;padding-left:0;list-style:none;counter-reset:g}
+.gstep ol li{counter-increment:g;position:relative;padding:0 0 10px 34px;line-height:1.7}
+.gstep ol li::before{content:counter(g);position:absolute;left:0;top:1px;width:24px;height:24px;border-radius:50%;background:#e11d48;color:#fff;font:700 13px/24px sans-serif;text-align:center}
+.gstep .tip{background:#fbf6ec;border-left:3px solid var(--gold);border-radius:6px;padding:8px 12px;font-size:13.5px;margin-top:6px}
+.gtoc{display:flex;flex-wrap:wrap;gap:6px}
+.gtoc a{font-size:13px;border:1px solid var(--line);border-radius:999px;padding:3px 12px;color:var(--ink);text-decoration:none;background:var(--card)}
+.gtoc a:hover{border-color:var(--gold)}
+@media(max-width:900px){ .gstep{grid-template-columns:1fr} }
 .range{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .range input[type=text]{width:110px}
 .range select{width:auto}
@@ -221,7 +232,7 @@ td.ac button{padding:4px 10px;font-size:13px}
     <button data-v="contacts" onclick="showContacts()"><span class="ic">📇</span>聯絡清單</button>
     <button data-v="trash" onclick="showTrash()"><span class="ic">🗑️</span>最近刪除</button>
     <span class="spacer"></span>
-    <button data-v="help" onclick="openGuide()"><span class="ic">?</span>使用說明</button>
+    <button data-v="help" onclick="showHelp()"><span class="ic">?</span>使用說明</button>
     <div class="sfoot"><b>CASEVORAS CERTTRACK</b><br>個人工作站・本機資料模式<br>v2</div>
   </nav>
   <div id="app"></div>
@@ -449,7 +460,66 @@ function panelsHTML(rs){
       ${att.length?`<ul class="mini">${att.map(r=>{ const s=statusOf(r); return `<li class="click" onclick="openFrom('${r.uid}')"><span>${esc(label(r))}<br><span class="muted small">${esc(TYPES[r.docType].name)}${r.docNo?'・'+esc(r.docNo):''}</span></span><span class="badge ${s.c}">${s.k==='late'?esc(s.extra):s.t}</span></li>`; }).join('')}</ul>`:'<div class="muted small">目前沒有需要處理的文件。</div>'}</div>`;
 }
 function openFrom(uid){ const r=records.find(x=>x.uid===uid); if(!r) return; if(!leave()) return; curType=r.docType; openRecord(uid); }
-function openGuide(){ showHome(); if(view!=='home') return; const g=$('#guide'); if(g){ g.open=true; g.scrollIntoView({behavior:'smooth',block:'start'}); } }
+function openGuide(){ showHelp(); }
+/* 圖文使用說明：截圖放在 guide/ 資料夾（皆為假資料） */
+const HELP = [
+  ['總覽：一眼看全部','01-overview',[
+    '上方四張小卡：<b>待辦、已逾期、30 天內到期、品質不合格</b>，數字是全部文件加起來的。',
+    '點「文件清單」裡的任何一類，就會進入那一類的清單。',
+    '「需要注意」列出最急的 5 件，<b>點一下就會打開那一筆</b>。'],'每天打開先看總覽，紅色數字就是今天要處理的。'],
+  ['清單：找到要處理的文件','02-list',[
+    '分頁按鈕：待辦、缺件、需要更新、尚未更新、不合格、全部。',
+    '搜尋框：可以搜<b>供應商、原料、原料分類、文件編號</b>。旁邊還能依文件狀態、原料分類篩選。',
+    '每一列右邊有「編輯」「刪除」。點整列也可以打開。'],'超過 20 筆會分頁，右下角可以改成每頁 30、50、100 件。'],
+  ['新增一筆紀錄','03-new-btn|04-form',[
+    '在清單頁按右上角「<b>＋ 新增…紀錄</b>」。',
+    '填寫<b>供應商名稱</b>和<b>原料或產品名稱</b>（有 * 的一定要填），再選<b>原料分類</b>。',
+    '檢驗項目、檢驗表需求、報告提供方式、附件都是選填。'],'還沒收到文件時，收件日期留空，狀態會顯示「缺件」，可以先建立當作提醒。'],
+  ['收到文件：填收件日期','05-dates',[
+    '<b>收件日期</b>：填收到文件的日子，不能晚於今天。',
+    '<b>更新週期</b>：4 個月、半年、1 年、2 年、3 年、5 年，或自訂日期。',
+    '<b>應提供或更新日期</b>會自動算出來，也可以自己改。',
+    '<b>文件收件狀態</b>由系統依日期自動判斷，不用自己選。'],'有進口分析或輸入許可的，可以填「進口效期」，到期前 30 天也會提醒。'],
+  ['品質確認，然後儲存','06-qc-save',[
+    '由品管判定<b>合格</b>或<b>不合格</b>。選不合格時，狀態會變成「需要更新」。',
+    '最後按左下角「<b>儲存</b>」。'],'有沒儲存的修改時，下方會顯示「● 有尚未儲存的修改」，離開前會再問一次。'],
+  ['刪除，與救回來','07-delete|08-trash',[
+    '按「刪除」會先跳出確認視窗，按「確定」才會刪除。',
+    '刪掉的紀錄會先進「<b>最近刪除</b>」。勾選後按「<b>還原</b>」就能救回來。'],'「最近刪除」保留 30 天，超過的會在下次打開工具時永久刪除。'],
+  ['匯出、匯入、備份','09-tools',[
+    '<b>匯出全部（Excel）</b>：下載一個有顏色、可篩選的 Excel，含摘要和各類清單。',
+    '<b>從 Excel 匯入</b>：把原料檢驗報告追蹤表匯進來。',
+    '<b>下載備份</b>：存一份全部資料（含附件、聯絡清單），請放到這台電腦以外的地方。',
+    '<b>從備份還原</b>：用備份檔救回資料，<b>會取代目前所有資料</b>。'],'建議每兩週到一個月按一次「下載備份」，存到自己的雲端硬碟。'],
+  ['Excel 匯入：先預覽再確認','10-import',[
+    '選好檔案後會先出現「<b>匯入預覽</b>」：預計匯入幾筆、各工作表幾筆、哪些需要人工確認。',
+    '往下捲，按「確認匯入」才會真的匯入。資料是加在原本的後面，不會蓋掉；同一份檔案不會重複匯入。'],'看不懂的格子會整段放進「備註」，匯入後記得看一下要人工確認的那幾筆。'],
+  ['聯絡清單','11-contacts',[
+    '按「<b>＋ 新增聯絡資料</b>」手動新增，或',
+    '按「<b>從 Excel 匯入</b>」匯入供應商資訊表。手機號碼寫在別的欄位，會自動移到「手機」欄。',
+    '注意上方的提醒：聯絡人和手機是個人資料。'],'截圖、寄送 Excel 或備份檔給別人之前，先遮蔽或刪除「聯絡人」「手機」兩欄。'],
+  ['手機版','12-mobile',[
+    '手機上，左邊的選單會變成上方一排按鈕，可以<b>左右滑</b>。'],'手機和電腦的資料不互通：資料只存在你打開的那台裝置、那個瀏覽器裡。']
+];
+function showHelp(){
+  if(!leave()) return;
+  view='help'; setSide('help');
+  $('#app').innerHTML = `
+    ${headHTML('使用說明','HOW TO USE','照著步驟操作，一次看懂每個按鈕。截圖都是假資料。','使用說明','')}
+    <div class="card"><div class="phd"><b>目錄</b></div><div class="gtoc">${HELP.map((h,i)=>`<a href="#g${i+1}" onclick="event.preventDefault();document.getElementById('g${i+1}').scrollIntoView({behavior:'smooth'})">${i+1}. ${h[0]}</a>`).join('')}</div></div>
+    ${HELP.map(([t,imgs,items,tip],i)=>`<div class="card" id="g${i+1}">
+      <div class="eyebrow">STEP ${String(i+1).padStart(2,'0')}</div><h2 style="margin:0 0 12px">${t}</h2>
+      <div class="gstep"><div>${imgs.split('|').map(n=>`<a href="guide/${n}.jpg" target="_blank" rel="noopener"><img src="guide/${n}.jpg" alt="${t}" loading="lazy"></a>`).join('')}</div>
+        <div><ol>${items.map(x=>`<li>${x}</li>`).join('')}</ol>${tip?`<div class="tip">💡 ${tip}</div>`:''}</div></div></div>`).join('')}
+    <div class="card"><div class="phd"><b>資料保存方式與限制（請務必閱讀）</b></div>
+      <ul class="small">
+        <li><b>本機儲存 · 僅在此裝置此瀏覽器有效 · 可匯出備份。</b>資料不會上傳，也不會同步到其他電腦或手機。</li>
+        <li>換瀏覽器、換電腦、使用無痕視窗，都看不到原本的資料。<b>請不要使用無痕視窗。</b></li>
+        <li>清除瀏覽資料時勾選「Cookie 和其他網站資料」，會讓全部紀錄和附件消失且無法復原。</li>
+        <li>請定期「下載備份」，把備份檔放在這台電腦以外的地方。</li>
+      </ul></div>`;
+  window.scrollTo(0,0);
+}
 
 /* =========================================================
    總覽頁
