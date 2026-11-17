@@ -377,6 +377,8 @@ function migrate(r){
   if(!Array.isArray(o.files)) o.files=[];
   if(!PERIODS.some(x=>x[0]===o.period)) o.period=(TYPES[o.docType]||TYPES.coa).per;
   if(o.provide==='隨貨') o.provide='報告書隨貨附';
+  /* 修正：新格式匯入時曾把「進口分析＋日期」誤當成進口效期，自動判讀出來的拿掉（手動填的保留） */
+  if(String(o.importKey||'').startsWith('v2#') && o.importExpiry && o.importExpiry===parseImport(o.testItems) && !o.importExpiryManual) o.importExpiry='';
   if(!o.uid){ o.uid=newUid(); if(!o.docNo && r.id) o.docNo=String(r.id); }
   delete o.id;
   if(o.docType==='cal' && o.item && !instrOf(o.item)){ o.itemOther=o.item; o.item='其他'; }
@@ -880,6 +882,7 @@ function onField(el){
   const f=el.dataset.f, oldAuto=autoOf(cur);
   cur[f]=el.value; dirty=true;
   if(f==='period' && cur.receivedDate && monthsOf(cur)) cur.dueDate=autoOf(cur);
+  if(f==='importExpiry') cur.importExpiryManual=true;
   if(f==='receivedDate'){
     if(cur.receivedDate && (!cur.dueDate || cur.dueDate===oldAuto)) cur.dueDate=autoOf(cur);
     if(!cur.receivedDate){ cur.dueDate=''; cur.qc='pending'; }
@@ -1246,7 +1249,8 @@ function planImportV2(sheets){
       if(dues.length>1){ plan.split++; if(lines.length!==dues.length) reasons.push(`有 ${dues.length} 個報告期限，但檢驗項目不是 ${dues.length} 行，兩筆都放了全部檢驗項目`); }
       parts.forEach((pt,pi)=>{
         const r=Object.assign(blankRecord(kind), {category:cat, item:noSuiHuo(item), supplier:noSuiHuo(ven), receivedDate:recv, testItems:noSuiHuo(pt.ti), testReq:str(c(iReq)),
-          importExpiry:parseImport(pt.ti), provide:parseProvide([ven,pt.ti,...extra].join(' ')), importKey:`v2#${sh.name}#${ri+1}#${pi}`});
+          importExpiry:'', provide:parseProvide([ven,pt.ti,...extra].join(' ')), importKey:`v2#${sh.name}#${ri+1}#${pi}`});
+        /* 新格式的「檢驗項目」欄沒有標明是進口效期，「進口分析20250704」可能只是分析日期，所以不自動當成效期 */
         if(pt.due){ r.period='custom'; r.dueDate=pt.due; } else { r.period=per||TYPES[kind].per; r.dueDate=autoOf(r); }
         if(!r.supplier){ r.supplier='（未填廠商）'; plan.noVendor++; }
         r.note=[`【Excel 匯入：${where}${parts.length>1?`（第 ${pi+1} 個期限）`:''}】`, ...note].join('\n');
