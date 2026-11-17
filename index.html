@@ -312,6 +312,16 @@ function dialog(msg, okText, cancelText){
   });
 }
 const ask = msg => dialog(msg, '確定', '取消');
+/* 多個選項的確認視窗：回傳按下的按鈕順序（0 起算），取消回傳 -1 */
+function choose(msg, labels){
+  return new Promise(res => {
+    const m = document.createElement('div'); m.className = 'modal';
+    m.innerHTML = `<div class="box" role="dialog" aria-modal="true"><div class="msg"></div><div class="row"><button data-i="-1">取消</button>${labels.map((l,i)=>`<button data-i="${i}" class="${i===0?'primary':''}">${esc(l)}</button>`).join('')}</div></div>`;
+    m.querySelector('.msg').textContent = msg;
+    m.querySelectorAll('button').forEach(b=>b.onclick=()=>{ m.remove(); res(+b.dataset.i); });
+    document.body.appendChild(m); m.querySelector('button.primary').focus();
+  });
+}
 function flash(t){
   const d = document.createElement('div'); d.textContent = t;
   d.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#1f6f5c;color:#fff;padding:8px 20px;border-radius:6px;z-index:99;box-shadow:0 2px 8px rgba(0,0,0,.2)';
@@ -517,12 +527,12 @@ const PAGE_GUIDE = {
   ],
   coa: ()=>docSteps('coa'), raw: ()=>docSteps('raw'), cal: ()=>docSteps('cal'),
   contacts: ()=>[
-    ['新增聯絡資料', MK(R('<span></span>',B('＋ 新增聯絡資料','d',1)), C('', R('代碼',F('A0001')), R('供應商 *',F('王小明食品行',2)), R('公司電話',F('02-1234-5678')))),
-      `<p>按「<b>＋ 新增聯絡資料</b>」${N(1)}，至少填<b>供應商</b>${N(2)}，其他像代碼、品項、公司電話、聯絡人、手機、檢驗報告都可以填。</p>`],
-    ['從 Excel 匯入', MK(R('<span></span>',B('從 Excel 匯入','',1)), C('', R('預計匯入','63 筆'), R('手機寫在別欄','→ 移到「手機」',N(2)))),
-      `<p>按「<b>從 Excel 匯入</b>」${N(1)}，選有「代碼」「供應商」欄位的表。</p><p>手機號碼寫在品項欄的，會自動移到「手機」${N(2)}；同一份檔案再匯入只會補上缺的聯絡人／手機。</p>`],
-    ['搜尋、編輯、刪除', MK(C('', R(F('搜尋 代碼／供應商／品項／聯絡人',1)), R('王小明食品行','<span>'+B('編輯','',2)+' '+B('刪除','r',3)+'</span>'))),
-      `<p>搜尋框${N(1)}可以找代碼、供應商、品項、聯絡人。每列「<b>編輯</b>」${N(2)}修改，「<b>刪除</b>」${N(3)}會先問一次。</p><p class="muted small">聯絡清單刪除後不會進「最近刪除」，要救回只能用備份還原。</p>`],
+    ['新增聯絡資料', MK(R('<span></span>',B('＋ 新增聯絡資料','d',1)), C('', R('供應商 *',F('王小明食品行',2)), R('品項',F('麵粉')), R('連絡電話',F('02-1234-5678')))),
+      `<p>按「<b>＋ 新增聯絡資料</b>」${N(1)}，至少填<b>供應商</b>${N(2)}，其他像品項、連絡電話、聯絡人、手機、檢驗報告獲取方式都可以填。</p>`],
+    ['從 Excel 匯入', MK(R('<span></span>',B('從 Excel 匯入','',1)), C('', R('取代全部',B('加在後面')), R('手機寫在別欄','→ 移到「手機」',N(2)))),
+      `<p>按「<b>從 Excel 匯入</b>」${N(1)}，選有「供應商」欄位的表（合併儲存格也看得懂，同一家會合成一筆）。</p><p>手機號碼寫在品項欄的，會自動移到「手機」${N(2)}。匯入時可以選「<b>取代全部</b>」或「加在後面」。</p>`],
+    ['搜尋、編輯、刪除', MK(C('', R(F('搜尋 供應商／品項／聯絡人',1)), R('王小明食品行','<span>'+B('編輯','',2)+' '+B('刪除','r',3)+'</span>'))),
+      `<p>搜尋框${N(1)}可以找供應商、品項、聯絡人、獲取方式。每列「<b>編輯</b>」${N(2)}修改，「<b>刪除</b>」${N(3)}會先問一次。</p><p class="muted small">聯絡清單刪除後不會進「最近刪除」，要救回只能用備份還原。</p>`],
     ['個資提醒', MK(C('', R('聯絡人',F('業務 王小明')), R('手機',F('0912-***-***',1)))),
       `<p>「聯絡人」「手機」${N(1)}是<b>個人資料</b>，只供自己使用。</p><p>截圖、寄送 Excel 或備份檔給別人之前，<b>先遮蔽或刪除這兩欄</b>。</p>`]
   ],
@@ -1014,7 +1024,7 @@ function exportXlsx(){
   const sheets=[['摘要', sheetXml('摘要',sumHead,sumRows,[22,10,18,10,12,10,12,13,10],false)],
     ['總表', sheetXml('總表',COLS.all.h,sortForReport(L).map(r=>recRow(r,COLS.all.k)),COLS.all.w)],
     ...Object.entries(TYPES).map(([k,t])=>{ const c=k==='cal'?COLS.cal:COLS.doc; return [t.name, sheetXml(t.name,c.h,sortForReport(ofType(k)).map(r=>recRow(r,c.k)),c.w)]; }),
-    ...(contacts.length?[['聯絡清單', sheetXml('聯絡清單',['代碼','供應商','品項','公司電話','聯絡人','手機','檢驗報告','備註'],contacts.map(c=>[c.code,c.supplier,c.items,c.phone,c.contact,c.mobile,c.report,c.note]),[12,22,30,16,14,16,24,30])]]:[])];
+    ...(contacts.length?[['聯絡清單', sheetXml('聯絡清單',['供應商','品項','連絡電話','聯絡人','手機','檢驗報告獲取方式','備註'],contacts.map(c=>[c.supplier,c.items,c.phone,c.contact,c.mobile,c.report,c.note]),[22,30,16,14,16,30,30])]]:[])];
   const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`
     +`<fonts count="7"><font><sz val="11"/><name val="Microsoft JhengHei"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Microsoft JhengHei"/></font>`
     +`<font><b/><sz val="11"/><color rgb="FF7D1A12"/><name val="Microsoft JhengHei"/></font><font><b/><sz val="11"/><color rgb="FF7A3D06"/><name val="Microsoft JhengHei"/></font>`
@@ -1048,7 +1058,7 @@ function exportXlsx(){
    從 Excel 匯入（原料檢驗報告追蹤表）：檔案只在這台電腦的瀏覽器裡讀取
    ========================================================= */
 let pendingImport = null;
-async function readXlsx(file){
+async function readXlsx(file, fillMerged){
   const buf=new Uint8Array(await file.arrayBuffer()), dv=new DataView(buf.buffer), td=new TextDecoder();
   let e=buf.length-22; while(e>=0 && dv.getUint32(e,true)!==0x06054b50) e--;
   if(e<0) throw new Error('not zip');
@@ -1082,6 +1092,13 @@ async function readXlsx(file){
         else if(v) val=(ty==='str'||ty==='e')?v.textContent:(ty==='b'?v.textContent==='1':+v.textContent);
         if(val!=null&&val!=='') row[colIdx(c.getAttribute('r'))]=val; });
       rows[ri]=row; });
+    /* 合併儲存格：只有左上角有值，選擇性地把值填進整個合併範圍 */
+    if(fillMerged) tags(xml(t),'mergeCell').forEach(mc=>{
+      const [a,b]=(mc.getAttribute('ref')||'').split(':'); if(!a||!b) return;
+      const r1=+a.replace(/\D/g,'')-1, r2=+b.replace(/\D/g,'')-1, c1=colIdx(a), c2=colIdx(b), v=(rows[r1]||[])[c1];
+      if(v==null) return;
+      for(let r=r1;r<=r2;r++){ rows[r]=rows[r]||[]; for(let c=c1;c<=c2;c++) if(rows[r][c]==null) rows[r][c]=v; }
+    });
     out.push({name:sh.getAttribute('name'), rows});
   }
   return out;
@@ -1223,13 +1240,13 @@ function showContacts(){
   if(!leave()) return;
   view='contacts'; ctCur=null; setSide('contacts');
   $('#app').innerHTML = `
-    ${headHTML('聯絡清單','SUPPLIER CONTACTS','供應商代碼、品項、聯絡方式與檢驗報告。','聯絡清單',
+    ${headHTML('聯絡清單','SUPPLIER CONTACTS','供應商、品項、聯絡方式與檢驗報告獲取方式。','聯絡清單',
       `<button class="primary pnew" onclick="editContact()">＋ 新增聯絡資料</button>
        <button class="lite" onclick="$('#ctFile').click()" title="從供應商資訊（.xlsx）匯入">從 Excel 匯入</button>${backupTools()}`)}
     <div class="notice info small">${PERSONAL_NOTE}</div>
     <div class="card">
       <div class="phd"><b>聯絡清單</b></div>
-      <input type="text" class="lsearch" placeholder="搜尋 代碼／供應商／品項／聯絡人" style="max-width:360px;margin-bottom:12px" value="${esc(ctSearch)}" oninput="ctSearch=this.value;renderContacts()">
+      <input type="text" class="lsearch" placeholder="搜尋 供應商／品項／聯絡人" style="max-width:360px;margin-bottom:12px" value="${esc(ctSearch)}" oninput="ctSearch=this.value;renderContacts()">
       <div id="ctBox"></div>
     </div>
     ${pageGuide('contacts')}`;
@@ -1237,11 +1254,11 @@ function showContacts(){
 }
 function renderContacts(){
   const q=ctSearch.trim().toLowerCase();
-  const rs=contacts.filter(c=>!q||[c.code,c.supplier,c.items,c.contact].join(' ').toLowerCase().includes(q));
+  const rs=contacts.filter(c=>!q||[c.supplier,c.items,c.contact,c.report].join(' ').toLowerCase().includes(q));
   $('#ctBox').innerHTML = `<div class="lcount">共 ${rs.length} 筆</div>` + (rs.length ? `<div style="overflow-x:auto"><table>
-    <thead><tr><th>代碼</th><th>供應商</th><th>品項</th><th>公司電話</th><th>聯絡人</th><th>手機</th><th>檢驗報告</th><th></th></tr></thead>
-    <tbody>${rs.map(c=>`<tr class="click" onclick="editContact('${c.uid}')"><td class="nw">${esc(c.code)||'—'}</td><td>${esc(c.supplier)||'—'}</td>
-      <td>${esc(c.items).replace(/\n/g,'<br>')||'—'}</td><td class="nw">${esc(c.phone)||'—'}</td><td>${esc(c.contact)||'—'}</td><td class="nw">${esc(c.mobile)||'—'}</td><td>${esc(c.report)||'—'}</td>
+    <thead><tr><th>供應商</th><th>品項</th><th>連絡電話</th><th>聯絡人</th><th>手機</th><th>檢驗報告獲取方式</th><th></th></tr></thead>
+    <tbody>${rs.map(c=>`<tr class="click" onclick="editContact('${c.uid}')"><td>${esc(c.supplier)||'—'}</td>
+      <td>${esc(c.items).replace(/\n/g,'<br>')||'—'}</td><td class="nw">${esc(c.phone)||'—'}</td><td>${esc(c.contact)||'—'}</td><td class="nw">${esc(c.mobile)||'—'}</td><td>${esc(c.report).replace(/\n/g,'<br>')||'—'}</td>
       <td class="ac" onclick="event.stopPropagation()"><button onclick="editContact('${c.uid}')">編輯</button> <button onclick="deleteContact('${c.uid}')">刪除</button></td></tr>`).join('')}
     </tbody></table></div>` : `<div class="empty">${contacts.length?'沒有符合條件的資料':'目前還沒有資料，請按「新增聯絡資料」或「從 Excel 匯入」'}</div>`);
 }
@@ -1258,8 +1275,8 @@ function editContact(uid){
       <h2 style="margin:0 8px;font-size:18px">${uid?esc(ctCur.supplier||'聯絡資料'):'新增聯絡資料'}</h2></div>
     <div class="notice info small">${PERSONAL_NOTE}</div>
     <div class="card"><div class="grid">
-      ${f('code','代碼','例：A0101')}${f('supplier','供應商 *','例：王小明食品行')}${f('phone','公司電話','例：02-1234-5678')}${f('contact','聯絡人','例：業務 王小明')}${f('mobile','手機','例：0912-345-678')}
-      ${f('items','品項','可以寫多項，一行一項',1)}${f('report','檢驗報告','例：每年一次、隨貨')}${f('note','備註','',1)}
+      ${f('supplier','供應商 *','例：王小明食品行')}${f('phone','連絡電話','例：02-1234-5678')}${f('contact','聯絡人','例：業務 王小明')}${f('mobile','手機','例：0912-345-678')}
+      ${f('items','品項','可以寫多項，一行一項',1)}${f('report','檢驗報告獲取方式','例：LINE、紙本、隨貨',1)}${f('note','備註','',1)}
     </div></div>
     <div class="savebar"><div class="in"><button class="primary" onclick="saveContact()">儲存</button><button onclick="showContacts()">返回清單</button></div></div>`;
   dirty=false; window.scrollTo(0,0);
@@ -1274,7 +1291,7 @@ function saveContact(){
 }
 async function deleteContact(uid){
   const c=contacts.find(x=>x.uid===uid); if(!c) return;
-  if(!(await ask(`確定要刪除「${c.supplier||c.code}」嗎？\n聯絡清單刪除後無法復原（可用備份還原）。`))) return;
+  if(!(await ask(`確定要刪除「${c.supplier}」嗎？\n聯絡清單刪除後無法復原（可用備份還原）。`))) return;
   const old=contacts.slice(); contacts=contacts.filter(x=>x.uid!==uid);
   if(!persistContacts()){ contacts=old; return; }
   renderContacts(); flash('已刪除');
@@ -1283,39 +1300,50 @@ async function importContacts(input){
   const file=input.files[0]; input.value=''; if(!file) return;
   if(!leave()) return;
   if(typeof DecompressionStream==='undefined'){ alert('這個瀏覽器版本太舊，無法讀取 Excel。請更新 Chrome 或 Edge 後再試。'); return; }
-  let sheets; try{ sheets=await readXlsx(file); }catch(e){ alert('無法讀取：請確認是 .xlsx 格式的 Excel 檔。'); return; }
-  const sh=sheets.find(x=>{ const h=(x.rows[0]||[]).map(str); return h.includes('供應商')&&h.includes('代碼'); });
-  if(!sh){ alert('找不到聯絡清單：需要有「代碼」和「供應商」欄位的工作表。'); return; }
-  const h=(sh.rows[0]||[]).map(str), ix=n=>h.indexOf(n), iC=ix('代碼'), iS=ix('供應商'), iI=ix('品項'), iP=h.findIndex(x=>x==='連絡電話'||x==='聯絡電話'||x==='電話'), iR=ix('檢驗報告'),
+  let sheets; try{ sheets=await readXlsx(file, true); }catch(e){ alert('無法讀取：請確認是 .xlsx 格式的 Excel 檔。'); return; }
+  const isPhone=x=>['連絡電話','聯絡電話','電話','公司電話'].includes(x), isRep=x=>/^檢驗報告/.test(x);
+  const sh=sheets.find(x=>{ const h=(x.rows[0]||[]).map(str); return h.includes('供應商') && (h.includes('品項')||h.some(isPhone)||h.includes('聯絡人')); });
+  if(!sh){ alert('找不到聯絡清單：需要有「供應商」欄位，以及品項、連絡電話或聯絡人其中一欄。'); return; }
+  const h=(sh.rows[0]||[]).map(str), iS=h.indexOf('供應商'), iI=h.indexOf('品項'), iP=h.findIndex(isPhone), iR=h.findIndex(isRep),
         iN=h.findIndex(x=>x==='聯絡人'||x==='連絡人'), iM=h.findIndex(x=>x==='手機');
-  const byKey=new Map(contacts.filter(c=>c.importKey).map(c=>[c.importKey,c])), add=[], moved=[], fill=[]; let dup=0;
+  /* 同一個供應商（合併儲存格或重複出現）合成一筆；品項一行一項 */
+  const groups=new Map(), moved=[];
   for(let ri=1; ri<sh.rows.length; ri++){
     const row=sh.rows[ri]||[], g=i=>i<0?'':str(row[i]);
-    const c={code:g(iC), supplier:g(iS), items:g(iI), phone:g(iP), report:g(iR), contact:g(iN), mobile:g(iM)};
-    if(!c.code&&!c.supplier&&!c.items&&!c.phone) continue;
-    /* 手機號碼寫在別的欄位（例如「0910-xxxxxx業務巫」）：號碼移到「手機」，剩下的字移到「聯絡人」 */
-    ['items','phone','report'].forEach(k=>{ const m=MOBILE.exec(c[k]); if(!m) return;
-      if(!c.mobile) c.mobile=m[0];
-      const rest=c[k].replace(m[0],'').replace(/^[\s,，、:：/／]+|[\s,，、:：/／]+$/g,'');
-      if(rest && !c.contact && rest.length<=8) c.contact=rest; else if(rest) c.note=[c.note,rest].filter(Boolean).join('\n');
-      c[k]=''; moved.push(`第 ${ri+1} 列`); });
-    const key=`${sh.name}#${ri+1}`, ex=byKey.get(key);
-    if(ex){ if((c.mobile&&!ex.mobile)||(c.contact&&!ex.contact)) fill.push([ex,c]); else dup++; continue; }
-    add.push(ctMigrate(Object.assign(c,{uid:'', importKey:key})));
+    const r={supplier:g(iS), item:g(iI), phone:g(iP), report:g(iR), contact:g(iN), mobile:g(iM)};
+    if(!r.supplier) continue;
+    ['item','phone','report','contact'].forEach(k=>{ const m=MOBILE.exec(r[k]); if(!m) return;
+      if(!r.mobile) r.mobile=m[0];
+      const rest=r[k].replace(m[0],'').replace(/^[\s,，、:：/／]+|[\s,，、:：/／]+$/g,'');
+      r[k] = k==='contact' ? rest : ''; if(k!=='contact' && rest && !r.contact && rest.length<=8) r.contact=rest;
+      moved.push(`第 ${ri+1} 列`); });
+    if(!groups.has(r.supplier)) groups.set(r.supplier,[]);
+    groups.get(r.supplier).push(r);
   }
-  if(!add.length&&!fill.length){ alert(dup?'這份檔案的聯絡資料之前都已經匯入過了。':'找不到可以匯入的聯絡資料。'); return; }
-  const msg=`工作表「${sh.name}」`
-    +(add.length?`\n預計匯入 ${add.length} 筆（加在原本資料後面）。`:'')
-    +(fill.length?`\n之前匯入時被略過的聯絡人／手機，這次補上 ${fill.length} 筆。`:'')
-    +(moved.length?`\n\n有 ${moved.length} 格的手機號碼寫在其他欄位，已移到「手機」欄：${[...new Set(moved)].join('、')}。`:'')
-    +(dup?`\n\n有 ${dup} 筆之前已匯入，這次略過。`:'')+'\n\n確定匯入嗎？';
-  if(!(await ask(msg))) return;
-  const old=contacts.map(c=>Object.assign({},c));
-  fill.forEach(([ex,c])=>{ if(!ex.mobile) ex.mobile=c.mobile; if(!ex.contact) ex.contact=c.contact; });
-  add.forEach(c=>{ c.uid='c'+newUid().slice(1); contacts.push(c); });
+  const uniq=a=>[...new Set(a.filter(Boolean))];
+  const list=[...groups.entries()].map(([sup,rs])=>{
+    const reps=rs.filter(r=>r.report), repSet=uniq(reps.map(r=>r.report));
+    const report = repSet.length<=1 ? (repSet[0]||'') : reps.map(r=>r.item?`${r.item}：${r.report}`:r.report).join('\n');
+    return ctMigrate({uid:'', supplier:sup, items:uniq(rs.map(r=>r.item)).join('\n'), phone:uniq(rs.map(r=>r.phone)).join('、'),
+      contact:uniq(rs.map(r=>r.contact)).join('、'), mobile:uniq(rs.map(r=>r.mobile)).join('、'), report, importKey:`${sh.name}#${sup}`});
+  });
+  if(!list.length){ alert('找不到可以匯入的聯絡資料。'); return; }
+  const names=new Set(contacts.map(c=>c.supplier));
+  const newOnes=list.filter(c=>!names.has(c.supplier)), same=list.length-newOnes.length;
+  const msg=`工作表「${sh.name}」：共 ${list.length} 家供應商（同一家的多個品項已合成一筆）。`
+    +(moved.length?`\n有 ${moved.length} 格的手機號碼已移到「手機」欄。`:'')
+    +`\n\n目前聯絡清單有 ${contacts.length} 筆，要怎麼匯入？`
+    +`\n・取代全部：刪掉目前 ${contacts.length} 筆，換成這 ${list.length} 筆`
+    +`\n・加在後面：只加入 ${newOnes.length} 家新的${same?`（${same} 家同名的略過）`:''}`
+    +`\n\n建議先「下載備份」。`;
+  const pick=await choose(msg, ['取代全部','加在後面']); if(pick<0) return;
+  const old=contacts.slice();
+  if(pick===0) contacts=list; else contacts=contacts.concat(newOnes);
+  contacts.forEach(c=>{ if(!c.uid) c.uid='c'+newUid().slice(1); });
   if(!persistContacts()){ contacts=old; return; }
-  showContacts(); flash(`已匯入 ${add.length} 筆`+(fill.length?`、補上 ${fill.length} 筆`:''));
+  showContacts(); flash(pick===0?`已取代，共 ${list.length} 筆`:`已加入 ${newOnes.length} 筆`);
 }
+
 async function backup(){
   const rs=live(), ids=new Set(rs.flatMap(r=>r.files.map(f=>f.id)));
   let files=[];
