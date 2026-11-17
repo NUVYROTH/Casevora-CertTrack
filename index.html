@@ -192,6 +192,11 @@ td.ac button{padding:4px 10px;font-size:13px}
 .range select{width:auto}
 .range .u{font-weight:700;min-width:28px}
 .range + .range{margin-top:8px}
+.pastebox{margin-top:6px;border:2px dashed var(--field);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--muted);background:#fbf8f1}
+.clipb{border:1px solid var(--gold);background:#fbf6ec;border-radius:999px;padding:0 7px;font-size:12px;line-height:18px;cursor:pointer}
+.clipb:hover{background:#f3ece0}
+.attv{max-width:900px!important;max-height:90vh;overflow:auto}
+.attv img{max-width:100%;border:1px solid var(--line);border-radius:6px;display:block;margin:6px 0}
 .atts{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
 .att{width:130px;border:1px solid var(--line);border-radius:8px;padding:6px;background:#fbf8f1;font-size:12px}
 .att a.pv{display:flex;align-items:center;justify-content:center;height:100px;border-radius:6px;background:#f3ece0;overflow:hidden;text-decoration:none;font-size:40px}
@@ -501,7 +506,7 @@ function docSteps(k){
         ? R('儀器名稱 *',F('磅秤 ▾',2))+R('校正公司 *',F('王小明校正行'))+R('校正範圍',F('0'),'～',F('30'),F('kg ▾',3))
         : R('供應商名稱 *',F('王小明食品行',2))+R('原料或產品 *',F('麵粉'))+R('原料分類',F('調味料 ▾',3)))),
       cal ? `<p>按右上角「＋ 新增${t.name}紀錄」${N(1)}，選<b>儀器名稱</b>${N(2)}（選「其他」可以自己打），填校正公司。</p><p class="muted small">校正範圍填「從～到」，單位${N(3)}依儀器自動帶出：磅秤 g／kg、溫度計 °C，溫濕度計有 °C 和 % 兩組。</p>`
-          : `<p>按右上角「＋ 新增${t.name}紀錄」${N(1)}，填<b>供應商名稱、原料或產品</b>${N(2)}（有 * 必填），選<b>原料分類</b>${N(3)}。</p><p class="muted small">還沒收到文件時，收件日期留空，狀態會顯示「缺件」，可以先建立當提醒。檢驗項目、檢驗表需求、提供方式、附件都是選填。</p>`],
+          : `<p>按右上角「＋ 新增${t.name}紀錄」${N(1)}，填<b>供應商名稱、原料或產品</b>${N(2)}（有 * 必填），選<b>原料分類</b>${N(3)}。</p><p class="muted small">還沒收到文件時，收件日期留空，狀態會顯示「缺件」，可以先建立當提醒。檢驗項目、檢驗表需求、提供方式、附件都是選填。附件可以直接按 <b>Ctrl＋V</b> 貼上截圖或 PDF。</p>`],
     ['收到文件：填日期', MK(C('收件與更新日期', R('收件日期',F('2026/11/01',1)), R('更新週期',F(`${t.per==='4m'?'4 個月':'1 年'} ▾`,2)), R('到期日',F(t.per==='4m'?'2027/03/01':'2027/11/01',3))), C('', R('文件收件狀態',ST('已更新','s-ok')))),
       `<p>填<b>收件日期</b>${N(1)}（不能晚於今天），選<b>更新週期</b>${N(2)}，<b>到期日</b>${N(3)}會自動算出來，也可以自己改。</p><p class="muted small">文件狀態由系統依日期自動判斷，不用自己選。${cal?'':'有進口分析或輸入許可的可以填「進口效期」，到期前 30 天提醒。'}</p>`],
     ['品質確認，然後儲存', MK(C('品質確認', R('品質確認狀態',F('合格 ▾',1))), R(B('儲存','d',2),B('返回清單'),'<span style="color:#b45309">● 有尚未儲存的修改</span>')),
@@ -509,7 +514,7 @@ function docSteps(k){
     ['找到要處理的文件', MK(C('', R(N(1)+'<span>'+B('待辦','d')+' '+B('缺件')+' '+B('逾期')+' '+B('全部')+'</span>'), R(F(cal?'搜尋 儀器／校正公司':'搜尋 供應商／原料',2)), cal?'':R(F('全部原料分類 ▾',3)))),
       `<p>用分頁${N(1)}切換<b>待辦、缺件、需要更新、尚未更新、不合格、全部</b>。</p><p>搜尋框${N(2)}可以找${cal?'<b>儀器、校正範圍、校正公司、編號</b>':'<b>供應商、原料、分類、編號</b>'}${cal?'':`；也可以依原料分類${N(3)}篩選`}。</p>`],
     ['編輯、刪除', MK(C('', R(cal?'磅秤':'王小明食品行',ST('逾期 35 天','s-late'),'<span>'+B('編輯','',1)+' '+B('刪除','r',2)+'</span>'), R('<span>'+N(3)+'☑ 全選本頁</span>',B('刪除（20）','r')))),
-      `<p>每一列右邊的「<b>編輯</b>」${N(1)}可以打開修改，「<b>刪除</b>」${N(2)}會先問一次再刪。</p><p>要一次刪很多筆：勾「<b>全選本頁</b>」${N(3)}再按「刪除（N）」。刪掉的先進「最近刪除」，30 天內可以還原。</p>`],
+      `<p>每一列右邊的「<b>編輯</b>」${N(1)}可以打開修改，「<b>刪除</b>」${N(2)}會先問一次再刪。</p><p>要一次刪很多筆：勾「<b>全選本頁</b>」${N(3)}再按「刪除（N）」。刪掉的先進「最近刪除」，30 天內可以還原。</p><p class="muted small">有附件的紀錄會顯示「📎2」，點一下就能直接看附件。</p>`],
     ['匯出這一類', MK(R('<span></span>',B('匯出報表（Excel）','',1)), C('', R('只匯出目前清單',ST('依分頁與篩選','s-need')))),
       `<p>「<b>匯出報表（Excel）</b>」${N(1)}只匯出<b>這一類、目前畫面上的清單</b>（會跟著分頁和篩選）。</p><p class="muted small">要全部三類一次匯出，請到「總覽」按「匯出全部（Excel）」。</p>`]
   ];
@@ -521,7 +526,7 @@ const PAGE_GUIDE = {
     ['進入各類清單', MK(C('文件清單', R(N(1)+'📄 廠商COA報告','待辦 2'), R('🧪 原物料外檢報告','待辦 1'), R('⚖️ 儀器校正外檢報告','待辦 1'))),
       `<p>點「文件清單」裡任何一類${N(1)}，或用左邊選單，就會進入那一類的清單。</p><p class="muted small">每一頁最下面都有那一頁的使用說明，點開就看得到。</p>`],
     ['匯出、從 Excel 匯入', MK(R(B('匯出全部（Excel）','d',1),B('從 Excel 匯入','',2)), C('匯入預覽（還沒匯入）', R('預計匯入','133 筆'), R('需要人工確認','<span style="color:#b42318">5 筆</span>'))),
-      `<p>「<b>匯出全部（Excel）</b>」${N(1)}：下載有顏色、可篩選的報表（摘要、總表、各類、聯絡清單）。</p><p>「<b>從 Excel 匯入</b>」${N(2)}：先出現<b>匯入預覽</b>，確認後才匯入；資料加在後面，不會蓋掉。</p>`],
+      `<p>「<b>匯出全部（Excel）</b>」${N(1)}：下載有顏色、可篩選的報表（摘要、總表、各類、聯絡清單）。</p><p>「<b>從 Excel 匯入</b>」${N(2)}：先出現<b>匯入預覽</b>，可以選「<b>更新報告資料</b>」（取代之前匯入的，手動新增的保留）或「加在後面」。</p>`],
     ['備份（每兩週到一個月做一次）', MK(R(B('下載備份','',1),B('從備份還原','',2)), C('', R('☁️ 放到自己的雲端硬碟'), R('<span style="color:#b42318">⚠ 還原會取代目前資料</span>'))),
       `<p>「<b>下載備份</b>」${N(1)}：存一份全部資料（含附件、聯絡清單），放到這台電腦以外的地方。</p><p>換電腦或資料不見時，用「<b>從備份還原</b>」${N(2)}，<b>會取代目前所有資料</b>。</p>`]
   ],
@@ -649,7 +654,7 @@ function renderTable(){
   const rs = all.slice((listPage-1)*pageSize, listPage*pageSize);
   const vis = new Set(rs.map(r=>r.uid)); listSel = new Set([...listSel].filter(id=>vis.has(id)));
   if(!rs.length){ $('#tableBox').innerHTML = `<div class="lcount">共 0 件</div><div class="empty">${ofType(curType).length?'沒有符合條件的紀錄':'目前還沒有紀錄，請按「新增紀錄」開始'}</div>`; return; }
-  const n = listSel.size, allOn = rs.every(r=>listSel.has(r.uid)), clip = r => (r.files||[]).length ? ' <span title="有附件">📎</span>' : '';
+  const n = listSel.size, allOn = rs.every(r=>listSel.has(r.uid)), clip = r => (r.files||[]).length ? ` <button class="clipb" title="看附件" onclick="event.stopPropagation();viewAtts('${r.uid}')">📎${r.files.length}</button>` : '';
   const no = r => r.docNo ? `<span class="st-sub">${esc(r.docNo)}</span>` : '';
   $('#tableBox').innerHTML = `<div class="lcount">共 ${all.length} 件</div><div class="row" style="margin-bottom:8px">
       <label class="selall"><input type="checkbox" ${allOn?'checked':''} onchange="listAll(this.checked)">全選本頁</label>
@@ -759,6 +764,7 @@ function renderDetail(){
         <div class="full"><label class="f">檢驗表需求（選填）</label><textarea data-f="testReq" placeholder="例：微生物：腸桿菌科＋沙門氏＋大腸桿" oninput="onField(this)">${esc(r.testReq)}</textarea></div>`}
         <div class="full"><label class="f">附件（圖片或 PDF，選填，單檔 20 MB 以內）</label>
           <input type="file" accept="image/*,application/pdf" multiple onchange="addFiles(this)">
+          <div class="pastebox">📋 也可以直接按 <b>Ctrl＋V</b> 貼上截圖、圖片或 PDF（從檔案總管複製的檔案也行）</div>
           <div class="muted small" style="margin-top:3px">附件只存在這台電腦的這個瀏覽器裡</div>
           <div class="atts" id="atts"></div></div>
       </div>
@@ -810,7 +816,7 @@ async function renderAtts(){
   }).join('');
 }
 async function addFiles(input){
-  const list=[...input.files]; input.value='';
+  const list=input.files?[...input.files]:input; if(input.files) input.value='';
   for(const file of list){
     if(!(file.type.startsWith('image/')||file.type==='application/pdf')){ alert(`「${file.name}」不是圖片或 PDF，已略過。`); continue; }
     if(file.size>MAX_FILE){ alert(`「${file.name}」超過 20 MB，已略過。`); continue; }
@@ -820,6 +826,30 @@ async function addFiles(input){
     cur.files.push(meta); dirty=true;
   }
   refreshForm(); renderAtts();
+}
+/* 編輯頁按 Ctrl＋V：貼上截圖、圖片或 PDF（從檔案總管複製的檔案也可以） */
+document.addEventListener('paste', e=>{
+  if(view!=='detail' || !cur) return;
+  const fs=[...(e.clipboardData&&e.clipboardData.files||[])].filter(f=>f.type.startsWith('image/')||f.type==='application/pdf');
+  if(!fs.length) return;
+  e.preventDefault();
+  const d=new Date(), stamp=`${today().replace(/-/g,'')}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
+  addFiles(fs.map((f,i)=>f.name&&f.name!=='image.png'?f:new File([f], `貼上_${stamp}${fs.length>1?'_'+(i+1):''}.${f.type==='application/pdf'?'pdf':(f.type.split('/')[1]||'png')}`, {type:f.type})))
+    .then(()=>flash(`已貼上 ${fs.length} 個附件（記得按「儲存」）`));
+});
+/* 清單上點 📎：直接看附件，不用進編輯頁 */
+async function viewAtts(uid){
+  const r=records.find(x=>x.uid===uid); if(!r) return;
+  const items=await Promise.all((r.files||[]).map(async f=>{ let o=null; try{ o=await fGet(f.id); }catch(e){} return {f,o}; }));
+  const urls=[], m=document.createElement('div'); m.className='modal';
+  const body=items.map(({f,o})=>{ if(!o) return `<p class="muted small">⚠️ 找不到「${esc(f.name)}」</p>`;
+    const u=URL.createObjectURL(o.blob); urls.push(u);
+    return `<div style="margin-bottom:10px"><div class="row"><b class="small">${esc(f.name)}</b><span class="muted small">${fmtSize(f.size)}</span><span class="spacer"></span><a class="small" href="${u}" target="_blank" rel="noopener">在新分頁打開 ↗</a></div>
+      ${f.type.startsWith('image/')?`<img src="${u}" alt="">`:`<iframe src="${u}" style="width:100%;height:60vh;border:1px solid var(--line);border-radius:6px"></iframe>`}</div>`; }).join('');
+  m.innerHTML=`<div class="box attv" role="dialog" aria-modal="true"><div class="row" style="margin-bottom:8px"><b>${esc(r.supplier)}｜${esc(itemLabel(r))}</b><span class="spacer"></span><button class="primary" id="attClose">關閉</button></div>${body}</div>`;
+  const close=()=>{ m.remove(); urls.forEach(u=>URL.revokeObjectURL(u)); };
+  m.addEventListener('click',e=>{ if(e.target===m) close(); }); m.querySelector('#attClose').onclick=close;
+  document.body.appendChild(m);
 }
 function removeAtt(id){
   if(!confirm('確定要移除這個附件嗎？（按「儲存」後才會生效）')) return;
@@ -1097,7 +1127,7 @@ async function readXlsx(file, fillMerged){
       const [a,b]=(mc.getAttribute('ref')||'').split(':'); if(!a||!b) return;
       const r1=+a.replace(/\D/g,'')-1, r2=+b.replace(/\D/g,'')-1, c1=colIdx(a), c2=colIdx(b), v=(rows[r1]||[])[c1];
       if(v==null) return;
-      for(let r=r1;r<=r2;r++){ rows[r]=rows[r]||[]; for(let c=c1;c<=c2;c++) if(rows[r][c]==null) rows[r][c]=v; }
+      for(let r=r1;r<=r2;r++){ rows[r]=rows[r]||[]; rows[r].filled=rows[r].filled||new Set(); for(let c=c1;c<=c2;c++) if(rows[r][c]==null){ rows[r][c]=v; rows[r].filled.add(c); } }
     });
     out.push({name:sh.getAttribute('name'), rows});
   }
@@ -1178,14 +1208,63 @@ function planImport(sheets){
   }
   return plan;
 }
+/* 新格式：廠商、原物料名稱／原料品項、報告日期、檢驗項目、報告期限、檢驗表需求（工作表名稱＝原料分類） */
+function planImportV2(sheets){
+  const plan={recs:[], flags:[], skipped:[], dup:0, sheets:[], noVendor:0, noItem:[], split:0, v2:true}, td=today();
+  for(const sh of sheets){
+    const hdr=(sh.rows[0]||[]).map(str), find=(...ns)=>hdr.findIndex(h=>ns.includes(h));
+    const iItem=find('原物料名稱','原料品項','原料名稱'), iVen=find('廠商'), iRecv=find('報告日期'), iTi=find('檢驗項目'), iDue=find('報告期限','期限','年限'), iReq=find('檢驗表需求');
+    if(iItem<0){ plan.skipped.push(sh.name); continue; }
+    const known=new Set([iItem,iVen,iRecv,iTi,iDue,iReq].filter(i=>i>=0)), cat=SHEET_CAT[sh.name]||'其他';
+    let n=0;
+    for(let ri=1; ri<sh.rows.length; ri++){
+      const row=sh.rows[ri]||[], c=i=>i<0?null:row[i], item=str(c(iItem));
+      const own=row.map((v,i)=>v!=null&&str(v)!==''&&!(row.filled&&row.filled.has(i))).some(Boolean);
+      if(!own) continue;   /* 只有合併儲存格延伸過來的值：是上一列的延續，不算新的一筆 */
+      if(!item){ plan.noItem.push(`${sh.name} 第 ${ri+1} 列`); continue; }
+      const ven=str(c(iVen)), where=`${sh.name} 第 ${ri+1} 列`, reasons=[], note=[];
+      const ti=str(c(iTi)), extra=row.map((v,i)=>!known.has(i)&&i>Math.max(...known)&&v!=null&&str(v)?str(v):'').filter(Boolean);
+      if(extra.length) note.push(...extra);
+      const self=/自[驗檢]/.test(ven)||/自[驗檢]SGS/.test(ti)||extra.some(x=>/自[驗檢]/.test(x));
+      const kind=self?'raw':'coa';
+      let recv=cellDate(c(iRecv)); const rawRecv=c(iRecv);
+      if(rawRecv!=null && !recv){ note.push('原報告日期：'+str(rawRecv)); reasons.push('報告日期看不懂，已改放備註'); }
+      if(recv && recv>td){ note.push('原報告日期：'+fmtDate(recv)); reasons.push(`報告日期 ${fmtDate(recv)} 晚於今天，已改放備註`); recv=''; }
+      /* 報告期限：「1年」等＝更新週期；日期＝指定到期日；兩個日期＝同品項不同檢驗項目，各自一筆 */
+      const dv=c(iDue); let dues=[], per='';
+      if(typeof dv==='number' && dv>20000) dues=[serialDate(dv)];
+      else if(typeof dv==='number' && [1,2,3,5].includes(dv)) per=dv+'y';
+      else if(dv!=null && str(dv)){
+        const t=str(dv), ds=(t.match(/\d{4}[.\/-]\d{1,2}[.\/-]\d{1,2}/g)||[]).map(cellDate).filter(Boolean);
+        if(ds.length) dues=ds; else { const p=parsePeriod(t); if(p.period) per=p.period; else { note.push('原報告期限：'+t); reasons.push(`報告期限「${t.replace(/\n/g,' ')}」看不懂，先用預設週期`); } }
+      }
+      const lines=ti.split('\n').map(x=>x.trim()).filter(Boolean);
+      const parts = dues.length>1 ? dues.map((d,i)=>({due:d, ti: lines.length===dues.length ? lines[i] : ti})) : [{due:dues[0]||'', ti}];
+      if(dues.length>1){ plan.split++; if(lines.length!==dues.length) reasons.push(`有 ${dues.length} 個報告期限，但檢驗項目不是 ${dues.length} 行，兩筆都放了全部檢驗項目`); }
+      parts.forEach((pt,pi)=>{
+        const r=Object.assign(blankRecord(kind), {category:cat, item, supplier:ven, receivedDate:recv, testItems:pt.ti, testReq:str(c(iReq)),
+          importExpiry:parseImport(pt.ti), provide:parseProvide([ven,pt.ti,...extra].join(' ')), importKey:`v2#${sh.name}#${ri+1}#${pi}`});
+        if(pt.due){ r.period='custom'; r.dueDate=pt.due; } else { r.period=per||TYPES[kind].per; r.dueDate=autoOf(r); }
+        if(!r.supplier){ r.supplier='（未填廠商）'; plan.noVendor++; }
+        r.note=[`【Excel 匯入：${where}${parts.length>1?`（第 ${pi+1} 個期限）`:''}】`, ...note].join('\n');
+        plan.recs.push(r); n++;
+      });
+      if(reasons.length) plan.flags.push({where, item, type:TYPES[kind].name, reasons});
+    }
+    plan.sheets.push({name:sh.name, n});
+  }
+  return plan;
+}
 async function importXlsx(input){
   const file=input.files[0]; input.value=''; if(!file) return;
   if(!leave()) return;
   if(typeof DecompressionStream==='undefined'){ alert('這個瀏覽器版本太舊，無法讀取 Excel。請更新 Chrome 或 Edge 後再試。'); return; }
   let sheets;
-  try{ sheets=await readXlsx(file); }catch(e){ alert('無法讀取：請確認是 .xlsx 格式的 Excel 檔（舊版 .xls 請先另存成 .xlsx）。'); return; }
-  pendingImport=planImport(sheets); pendingImport.file=file.name;
-  if(!pendingImport.recs.length){ alert(pendingImport.dup?'這份檔案的資料之前都已經匯入過了，沒有新的紀錄。':'找不到可以匯入的資料（需要有「原料品項」欄位的工作表）。'); pendingImport=null; return; }
+  try{ sheets=await readXlsx(file, true); }catch(e){ alert('無法讀取：請確認是 .xlsx 格式的 Excel 檔（舊版 .xls 請先另存成 .xlsx）。'); return; }
+  const v2=sheets.some(x=>(x.rows[0]||[]).map(str).includes('報告期限'));
+  if(!v2){ try{ sheets=await readXlsx(file); }catch(e){} }
+  pendingImport=v2?planImportV2(sheets):planImport(sheets); pendingImport.file=file.name; pendingImport.mode='replace';
+  if(!pendingImport.recs.length){ alert(pendingImport.dup?'這份檔案的資料之前都已經匯入過了，沒有新的紀錄。':'找不到可以匯入的資料（需要有「原料品項」或「原物料名稱」欄位的工作表）。'); pendingImport=null; return; }
   showImportPreview();
 }
 function showImportPreview(){
@@ -1196,9 +1275,9 @@ function showImportPreview(){
     <div class="ptitle" style="margin-bottom:12px"><h1>匯入預覽</h1><div class="eyebrow">IMPORT PREVIEW</div>
       <span class="muted">檔案：${esc(P.file)}。<b>還沒有匯入</b>，請先確認下面的內容。</span></div>
     <div class="kpis">
-      <div class="kpi"><span class="kic" aria-hidden="true">${KIC.doc}</span><div class="l">預計匯入</div><div class="n">${P.recs.length}<small>筆</small></div><div class="d">加在原本資料後面，不會蓋掉</div></div>
-      <div class="kpi info"><span class="kic kin" aria-hidden="true">${KIC.doc}</span><div class="l">廠商COA報告</div><div class="n">${by('coa')}<small>筆</small></div><div class="d">來自「廠商報告」欄</div></div>
-      <div class="kpi info"><span class="kic kin" aria-hidden="true">${KIC.doc}</span><div class="l">原物料外檢報告</div><div class="n">${by('raw')}<small>筆</small></div><div class="d">來自「外驗日期」與自驗 SGS</div></div>
+      <div class="kpi"><span class="kic" aria-hidden="true">${KIC.doc}</span><div class="l">預計匯入</div><div class="n">${P.recs.length}<small>筆</small></div><div class="d">${P.split?`其中 ${P.split} 個品項有兩個期限，拆成兩筆`:'依下方選擇的方式匯入'}</div></div>
+      <div class="kpi info"><span class="kic kin" aria-hidden="true">${KIC.doc}</span><div class="l">廠商COA報告</div><div class="n">${by('coa')}<small>筆</small></div><div class="d">${P.v2?'廠商提供的報告':'來自「廠商報告」欄'}</div></div>
+      <div class="kpi info"><span class="kic kin" aria-hidden="true">${KIC.doc}</span><div class="l">原物料外檢報告</div><div class="n">${by('raw')}<small>筆</small></div><div class="d">${P.v2?'自檢／自驗 SGS':'來自「外驗日期」與自驗 SGS'}</div></div>
       <div class="kpi warn"><span class="kic kw" aria-hidden="true">${KIC.x}</span><div class="l">需要人工確認</div><div class="n">${P.flags.length}<small>筆</small></div><div class="d">${P.flags.length?'匯入後請逐筆檢查':'沒有需要確認的'}</div></div>
     </div>
     <div class="card"><div class="phd"><b>各工作表筆數</b></div>
@@ -1212,16 +1291,23 @@ function showImportPreview(){
       <div style="overflow-x:auto"><table><thead><tr><th>位置</th><th>原料品項</th><th>匯入到</th><th>原因</th></tr></thead><tbody>
       ${P.flags.map(f=>`<tr><td class="nw">${esc(f.where)}</td><td>${esc(f.item)}</td><td class="nw">${esc(f.type)}</td><td>${f.reasons.map(esc).join('<br>')}</td></tr>`).join('')}
       </tbody></table></div></div>`:''}
+    ${(()=>{ const oldImp=live().filter(r=>r.importKey), withF=oldImp.filter(r=>(r.files||[]).length).length, manual=live().filter(r=>!r.importKey).length;
+      return `<div class="card"><div class="phd"><b>匯入方式</b></div>
+      <label class="row" style="margin:4px 0"><input type="radio" name="impMode" ${P.mode==='replace'?'checked':''} onchange="pendingImport.mode='replace'"><span><b>更新報告資料</b>：取代之前從 Excel 匯入的 ${oldImp.length} 筆，你手動新增的 ${manual} 筆會保留</span></label>
+      ${withF?`<div class="notice small" style="background:#fdecea;color:#7d1a12">⚠ 之前匯入的紀錄裡，有 ${withF} 筆已經加了附件；選「更新報告資料」時，這些附件會跟著舊紀錄移到「最近刪除」（30 天內可還原）。</div>`:''}
+      <label class="row" style="margin:4px 0"><input type="radio" name="impMode" ${P.mode==='append'?'checked':''} onchange="pendingImport.mode='append'"><span><b>加在後面</b>：原本的資料全部保留</span></label></div>`; })()}
     <div class="card"><div class="row">
       <button class="primary" onclick="confirmImport()">確認匯入 ${P.recs.length} 筆</button>
       <button onclick="pendingImport=null;showHome()">取消</button>
       <span class="muted small">建議匯入前先按「下載備份」</span></div></div>`;
   window.scrollTo(0,0);
 }
-function confirmImport(){
+async function confirmImport(){
   const P=pendingImport; if(!P) return;
-  if(!confirm(`確定要匯入 ${P.recs.length} 筆嗎？`)) return;
-  const now=Date.now(), stamp=new Date().toLocaleString('zh-TW'), old=records.slice();
+  const oldImp=P.mode==='replace'?live().filter(r=>r.importKey):[];
+  if(!(await ask(`確定要匯入 ${P.recs.length} 筆嗎？`+(oldImp.length?`\n之前從 Excel 匯入的 ${oldImp.length} 筆會移到「最近刪除」（30 天內可還原）。`:'')))) return;
+  const now=Date.now(), stamp=new Date().toLocaleString('zh-TW'), old=records.map(r=>Object.assign({},r));
+  oldImp.forEach(r=>{ r.deleted=true; r.deletedAt=today(); });
   P.recs.forEach((r,i)=>{ r.uid=newUid(); r.createdTs=now+i; r.createdAt=stamp; r.updatedAt=stamp; delete r.importedFrom; records.push(r); });
   if(!persist()){ records=old; return; }
   pendingImport=null; showHome(); flash(`已匯入 ${P.recs.length} 筆`);
