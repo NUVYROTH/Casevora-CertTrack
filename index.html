@@ -280,9 +280,9 @@ const INSTR = [
 ];
 const instrOf = name => INSTR.find(x=>x[0]===name);
 const QC = {pending:'尚未判定', pass:'合格', fail:'不合格'};
-const CATS = ['水產','家畜','禽類','蔬菜＋副原料','調味料','香料','包材','其他'];
+const CATS = ['水產','家畜','禽類','蔬菜＋副原料','調味料','香料','添加物','包材','其他'];
 const PERIODS = [['4m','4 個月',4],['6m','半年',6],['1y','1 年',12],['2y','2 年',24],['3y','3 年',36],['5y','5 年',60],['custom','自訂日期',0]];
-const PROVIDE = ['隨貨','紙本','電子檔','官網下載','其他'];
+const PROVIDE = ['報告書隨貨附','紙本','電子檔','官網下載','其他'];
 let records = [];
 records = loadAll();
 let view = 'home', curType = 'coa';
@@ -376,6 +376,7 @@ function migrate(r){
   if(!QC[o.qc]) o.qc='pending';
   if(!Array.isArray(o.files)) o.files=[];
   if(!PERIODS.some(x=>x[0]===o.period)) o.period=(TYPES[o.docType]||TYPES.coa).per;
+  if(o.provide==='隨貨') o.provide='報告書隨貨附';
   if(!o.uid){ o.uid=newUid(); if(!o.docNo && r.id) o.docNo=String(r.id); }
   delete o.id;
   if(o.docType==='cal' && o.item && !instrOf(o.item)){ o.itemOther=o.item; o.item='其他'; }
@@ -1133,7 +1134,7 @@ async function readXlsx(file, fillMerged){
   }
   return out;
 }
-const SHEET_CAT={'水產':'水產','家畜':'家畜','禽類':'禽類','蔬菜+副原料':'蔬菜＋副原料','蔬菜＋副原料':'蔬菜＋副原料','調味料':'調味料','香料':'香料','包材':'包材'};
+const SHEET_CAT={'水產':'水產','家畜':'家畜','禽類':'禽類','蔬菜+副原料':'蔬菜＋副原料','蔬菜＋副原料':'蔬菜＋副原料','調味料':'調味料','香料':'香料','包材':'包材','振芳':'添加物','資川':'添加物','廠商-芳':'添加物','廠商-川':'添加物','添加物':'添加物'};
 const serialDate=n=>{ const d=new Date(Date.UTC(1899,11,30)+Math.round(n)*86400000); return d.toISOString().slice(0,10); };
 function cellDate(v){
   if(typeof v==='number' && v>20000 && v<80000) return serialDate(v);
@@ -1153,7 +1154,9 @@ function parseImport(t){
   const m=/(進口分析|輸入許可|進口許可)\s*(\d{4})(\d{2})(\d{2})/.exec(t||''); if(!m) return '';
   const d=`${m[2]}-${m[3]}-${m[4]}`; return isNaN(new Date(d))?'':d;
 }
-function parseProvide(t){ return /官網下載/.test(t)?'官網下載':/隨貨/.test(t)?'隨貨':''; }
+function parseProvide(t){ return /官網下載/.test(t)?'官網下載':/隨貨/.test(t)?'報告書隨貨附':''; }
+/* 「(隨貨)」改用「報告提供方式」記錄，名稱和檢驗項目裡不再重複寫 */
+const noSuiHuo = t => String(t||'').replace(/[（(]\s*隨貨\s*[)）]/g,'').replace(/[ \t]+\n/g,'\n').trim();
 function planImport(sheets){
   const plan={recs:[], flags:[], skipped:[], dup:0, sheets:[], noVendor:0, noItem:[]}, td=today();
   const keys=new Set(records.map(r=>r.importKey).filter(Boolean));
@@ -1242,7 +1245,7 @@ function planImportV2(sheets){
       const parts = dues.length>1 ? dues.map((d,i)=>({due:d, ti: lines.length===dues.length ? lines[i] : ti})) : [{due:dues[0]||'', ti}];
       if(dues.length>1){ plan.split++; if(lines.length!==dues.length) reasons.push(`有 ${dues.length} 個報告期限，但檢驗項目不是 ${dues.length} 行，兩筆都放了全部檢驗項目`); }
       parts.forEach((pt,pi)=>{
-        const r=Object.assign(blankRecord(kind), {category:cat, item, supplier:ven, receivedDate:recv, testItems:pt.ti, testReq:str(c(iReq)),
+        const r=Object.assign(blankRecord(kind), {category:cat, item:noSuiHuo(item), supplier:noSuiHuo(ven), receivedDate:recv, testItems:noSuiHuo(pt.ti), testReq:str(c(iReq)),
           importExpiry:parseImport(pt.ti), provide:parseProvide([ven,pt.ti,...extra].join(' ')), importKey:`v2#${sh.name}#${ri+1}#${pi}`});
         if(pt.due){ r.period='custom'; r.dueDate=pt.due; } else { r.period=per||TYPES[kind].per; r.dueDate=autoOf(r); }
         if(!r.supplier){ r.supplier='（未填廠商）'; plan.noVendor++; }
