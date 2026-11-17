@@ -527,7 +527,7 @@ const PAGE_GUIDE = {
     ['進入各類清單', MK(C('文件清單', R(N(1)+'📄 廠商COA報告','待辦 2'), R('🧪 原物料外檢報告','待辦 1'), R('⚖️ 儀器校正外檢報告','待辦 1'))),
       `<p>點「文件清單」裡任何一類${N(1)}，或用左邊選單，就會進入那一類的清單。</p><p class="muted small">每一頁最下面都有那一頁的使用說明，點開就看得到。</p>`],
     ['匯出、從 Excel 匯入', MK(R(B('匯出全部（Excel）','d',1),B('從 Excel 匯入','',2)), C('匯入預覽（還沒匯入）', R('預計匯入','133 筆'), R('需要人工確認','<span style="color:#b42318">5 筆</span>'))),
-      `<p>「<b>匯出全部（Excel）</b>」${N(1)}：下載有顏色、可篩選的報表（摘要、總表、各類、聯絡清單）。</p><p>「<b>從 Excel 匯入</b>」${N(2)}：先出現<b>匯入預覽</b>，可以選「<b>更新報告資料</b>」（取代之前匯入的，手動新增的保留）或「加在後面」。</p>`],
+      `<p>「<b>匯出全部（Excel）</b>」${N(1)}：下載有顏色、可篩選的報表（摘要、總表、各類、聯絡清單）。</p><p>「<b>從 Excel 匯入</b>」${N(2)}：先出現<b>匯入預覽</b>，按「確認匯入」後可以選「<b>取代全部</b>」或「加在後面」。</p>`],
     ['備份（每兩週到一個月做一次）', MK(R(B('下載備份','',1),B('從備份還原','',2)), C('', R('☁️ 放到自己的雲端硬碟'), R('<span style="color:#b42318">⚠ 還原會取代目前資料</span>'))),
       `<p>「<b>下載備份</b>」${N(1)}：存一份全部資料（含附件、聯絡清單），放到這台電腦以外的地方。</p><p>換電腦或資料不見時，用「<b>從備份還原</b>」${N(2)}，<b>會取代目前所有資料</b>。</p>`]
   ],
@@ -1266,7 +1266,7 @@ async function importXlsx(input){
   try{ sheets=await readXlsx(file, true); }catch(e){ alert('無法讀取：請確認是 .xlsx 格式的 Excel 檔（舊版 .xls 請先另存成 .xlsx）。'); return; }
   const v2=sheets.some(x=>(x.rows[0]||[]).map(str).includes('報告期限'));
   if(!v2){ try{ sheets=await readXlsx(file); }catch(e){} }
-  pendingImport=v2?planImportV2(sheets):planImport(sheets); pendingImport.file=file.name; pendingImport.mode='replace';
+  pendingImport=v2?planImportV2(sheets):planImport(sheets); pendingImport.file=file.name;
   if(!pendingImport.recs.length){ alert(pendingImport.dup?'這份檔案的資料之前都已經匯入過了，沒有新的紀錄。':'找不到可以匯入的資料（需要有「原料品項」或「原物料名稱」欄位的工作表）。'); pendingImport=null; return; }
   showImportPreview();
 }
@@ -1278,7 +1278,7 @@ function showImportPreview(){
     <div class="ptitle" style="margin-bottom:12px"><h1>匯入預覽</h1><div class="eyebrow">IMPORT PREVIEW</div>
       <span class="muted">檔案：${esc(P.file)}。<b>還沒有匯入</b>，請先確認下面的內容。</span></div>
     <div class="kpis">
-      <div class="kpi"><span class="kic" aria-hidden="true">${KIC.doc}</span><div class="l">預計匯入</div><div class="n">${P.recs.length}<small>筆</small></div><div class="d">${P.split?`其中 ${P.split} 個品項有兩個期限，拆成兩筆`:'依下方選擇的方式匯入'}</div></div>
+      <div class="kpi"><span class="kic" aria-hidden="true">${KIC.doc}</span><div class="l">預計匯入</div><div class="n">${P.recs.length}<small>筆</small></div><div class="d">${P.split?`其中 ${P.split} 個品項有兩個期限，拆成兩筆`:'按「確認匯入」後選擇取代或加在後面'}</div></div>
       <div class="kpi info"><span class="kic kin" aria-hidden="true">${KIC.doc}</span><div class="l">廠商COA報告</div><div class="n">${by('coa')}<small>筆</small></div><div class="d">${P.v2?'廠商提供的報告':'來自「廠商報告」欄'}</div></div>
       <div class="kpi info"><span class="kic kin" aria-hidden="true">${KIC.doc}</span><div class="l">原物料外檢報告</div><div class="n">${by('raw')}<small>筆</small></div><div class="d">${P.v2?'自檢／自驗 SGS':'來自「外驗日期」與自驗 SGS'}</div></div>
       <div class="kpi warn"><span class="kic kw" aria-hidden="true">${KIC.x}</span><div class="l">需要人工確認</div><div class="n">${P.flags.length}<small>筆</small></div><div class="d">${P.flags.length?'匯入後請逐筆檢查':'沒有需要確認的'}</div></div>
@@ -1294,11 +1294,6 @@ function showImportPreview(){
       <div style="overflow-x:auto"><table><thead><tr><th>位置</th><th>原料品項</th><th>匯入到</th><th>原因</th></tr></thead><tbody>
       ${P.flags.map(f=>`<tr><td class="nw">${esc(f.where)}</td><td>${esc(f.item)}</td><td class="nw">${esc(f.type)}</td><td>${f.reasons.map(esc).join('<br>')}</td></tr>`).join('')}
       </tbody></table></div></div>`:''}
-    ${(()=>{ const oldImp=live().filter(r=>r.importKey), withF=oldImp.filter(r=>(r.files||[]).length).length, manual=live().filter(r=>!r.importKey).length;
-      return `<div class="card"><div class="phd"><b>匯入方式</b></div>
-      <label class="row" style="margin:4px 0"><input type="radio" name="impMode" ${P.mode==='replace'?'checked':''} onchange="pendingImport.mode='replace'"><span><b>更新報告資料</b>：取代之前從 Excel 匯入的 ${oldImp.length} 筆，你手動新增的 ${manual} 筆會保留</span></label>
-      ${withF?`<div class="notice small" style="background:#fdecea;color:#7d1a12">⚠ 之前匯入的紀錄裡，有 ${withF} 筆已經加了附件；選「更新報告資料」時，這些附件會跟著舊紀錄移到「最近刪除」（30 天內可還原）。</div>`:''}
-      <label class="row" style="margin:4px 0"><input type="radio" name="impMode" ${P.mode==='append'?'checked':''} onchange="pendingImport.mode='append'"><span><b>加在後面</b>：原本的資料全部保留</span></label></div>`; })()}
     <div class="card"><div class="row">
       <button class="primary" onclick="confirmImport()">確認匯入 ${P.recs.length} 筆</button>
       <button onclick="pendingImport=null;showHome()">取消</button>
@@ -1307,8 +1302,15 @@ function showImportPreview(){
 }
 async function confirmImport(){
   const P=pendingImport; if(!P) return;
-  const oldImp=P.mode==='replace'?live().filter(r=>r.importKey):[];
-  if(!(await ask(`確定要匯入 ${P.recs.length} 筆嗎？`+(oldImp.length?`\n之前從 Excel 匯入的 ${oldImp.length} 筆會移到「最近刪除」（30 天內可還原）。`:'')))) return;
+  const cur2=live().filter(r=>r.docType!=='cal'), withF=cur2.filter(r=>(r.files||[]).length).length;
+  const pick=await choose(`預計匯入 ${P.recs.length} 筆。`
+    +`\n目前廠商COA報告＋原物料外檢報告共 ${cur2.length} 筆，要怎麼匯入？`
+    +`\n\n・取代全部：目前這 ${cur2.length} 筆移到「最近刪除」（30 天內可還原），換成這 ${P.recs.length} 筆。儀器校正外檢報告不會動。`
+    +(withF?`\n　⚠ 其中 ${withF} 筆有附件，附件會跟著移到「最近刪除」。`:'')
+    +`\n・加在後面：原本的資料全部保留。`
+    +`\n\n建議先「下載備份」。`, ['取代全部','加在後面']);
+  if(pick<0) return;
+  const oldImp=pick===0?cur2:[];
   const now=Date.now(), stamp=new Date().toLocaleString('zh-TW'), old=records.map(r=>Object.assign({},r));
   oldImp.forEach(r=>{ r.deleted=true; r.deletedAt=today(); });
   P.recs.forEach((r,i)=>{ r.uid=newUid(); r.createdTs=now+i; r.createdAt=stamp; r.updatedAt=stamp; delete r.importedFrom; records.push(r); });
