@@ -352,10 +352,12 @@ const fKeys = () => fx('readonly', st=>st.getAllKeys());
 const fClear = () => fx('readwrite', st=>st.clear());
 function fmtSize(n){ return n>=1048576 ? (n/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(n/1024))+' KB'; }
 /* 刪掉沒有任何紀錄在用的附件（包含「最近刪除」裡的紀錄都算在用） */
+/* 一筆紀錄目前的附件＋歷史報告的附件 */
+const allFiles = r => (r.files||[]).concat(...(r.history||[]).map(h=>h.files||[]));
 async function cleanupFiles(){
   try{
-    const used=new Set(records.flatMap(r=>(r.files||[]).map(f=>f.id)));
-    if(cur) (cur.files||[]).forEach(f=>used.add(f.id));
+    const used=new Set(records.flatMap(r=>allFiles(r).map(f=>f.id)));
+    if(cur) allFiles(cur).forEach(f=>used.add(f.id));
     const keys=(await fKeys()).filter(k=>!used.has(k));
     if(keys.length) await fx('readwrite', st=>{ keys.forEach(k=>st.delete(k)); });
   }catch(e){}
@@ -365,7 +367,7 @@ const blobToDataUrl = b => new Promise((ok,no)=>{ const fr=new FileReader(); fr.
 /* ---------- 資料 ---------- */
 function blankRecord(type){
   return {uid:'', docType:type||'coa', docNo:'', supplier:'', item:'', itemOther:'', rFrom:'', rTo:'', rUnit:'', r2From:'', r2To:'',
-          fileLoc:'', files:[], category:'', period:'', testItems:'', testReq:'', provide:'', importExpiry:'', importKey:'', receivedDate:'', dueDate:'', qc:'pending', note:'', createdAt:'', createdTs:0, updatedAt:''};
+          fileLoc:'', files:[], history:[], category:'', period:'', testItems:'', testReq:'', provide:'', importExpiry:'', importKey:'', receivedDate:'', dueDate:'', qc:'pending', note:'', createdAt:'', createdTs:0, updatedAt:''};
 }
 function newUid(){ let u; do{ u='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }while(records && records.some(r=>r.uid===u)); return u; }
 /* 舊版（v1）紀錄也能讀：舊編號 COA-001 搬到「文件編號」，儀器名稱不在選單裡的放進「其他」 */
@@ -375,6 +377,7 @@ function migrate(r){
   if(!TYPES[o.docType]) o.docType='coa';
   if(!QC[o.qc]) o.qc='pending';
   if(!Array.isArray(o.files)) o.files=[];
+  if(!Array.isArray(o.history)) o.history=[];
   if(!PERIODS.some(x=>x[0]===o.period)) o.period=(TYPES[o.docType]||TYPES.coa).per;
   if(o.provide==='隨貨') o.provide='報告書隨貨附';
   /* 修正：新格式匯入時曾把「進口分析＋日期」誤當成進口效期，自動判讀出來的拿掉（手動填的保留） */
@@ -510,6 +513,8 @@ function docSteps(k){
         : R('供應商名稱 *',F('王小明食品行',2))+R('原料或產品 *',F('麵粉'))+R('原料分類',F('調味料 ▾',3)))),
       cal ? `<p>按右上角「＋ 新增${t.name}紀錄」${N(1)}，選<b>儀器名稱</b>${N(2)}（選「其他」可以自己打），填校正公司。</p><p class="muted small">校正範圍填「從～到」，單位${N(3)}依儀器自動帶出：磅秤 g／kg、溫度計 °C，溫濕度計有 °C 和 % 兩組。</p>`
           : `<p>按右上角「＋ 新增${t.name}紀錄」${N(1)}，填<b>供應商名稱、原料或產品</b>${N(2)}（有 * 必填），選<b>原料分類</b>${N(3)}。</p><p class="muted small">還沒收到文件時，收件日期留空，狀態會顯示「缺件」，可以先建立當提醒。檢驗項目、檢驗表需求、提供方式、附件都是選填。附件可以直接按 <b>Ctrl＋V</b> 貼上截圖或 PDF。</p>`],
+    ['收到新報告（更新）', MK(R('<span></span>',B('📄 收到新報告','d',1)), C('', R('廠商',F('資川 ▾',2)), R(cal?'儀器':'原物料',F(cal?'磅秤 ▾':'黑胡椒粉 ▾',3))), C('歷史報告',R('2024/03/09','📎1','保存到 2029/03/09'))),
+      `<p>收到新的一份報告時，按清單上方「<b>📄 收到新報告</b>」${N(1)}，選${cal?'校正公司':'廠商'}${N(2)}、${cal?'儀器':'原物料'}${N(3)}，按「下一步」。</p><p>舊報告會<b>自動存進「歷史報告」</b>，從收件日起保留 5 年；你只要填新的收件日期、Ctrl＋V 貼上新報告、判定品質，再按儲存。</p><p class="muted small">已經打開那一筆時，也可以直接按右上角的「📄 收到新報告」。</p>`],
     ['收到文件：填日期', MK(C('收件與更新日期', R('收件日期',F('2026/11/01',1)), R('更新週期',F(`${t.per==='4m'?'4 個月':'1 年'} ▾`,2)), R('到期日',F(t.per==='4m'?'2027/03/01':'2027/11/01',3))), C('', R('文件收件狀態',ST('已更新','s-ok')))),
       `<p>填<b>收件日期</b>${N(1)}（不能晚於今天），選<b>更新週期</b>${N(2)}，<b>到期日</b>${N(3)}會自動算出來，也可以自己改。</p><p class="muted small">文件狀態由系統依日期自動判斷，不用自己選。${cal?'':'有進口分析或輸入許可的可以填「進口效期」，到期前 30 天提醒。'}</p>`],
     ['品質確認，然後儲存', MK(C('品質確認', R('品質確認狀態',F('合格 ▾',1))), R(B('儲存','d',2),B('返回清單'),'<span style="color:#b45309">● 有尚未儲存的修改</span>')),
@@ -573,9 +578,15 @@ function showHelp(){
 /* =========================================================
    總覽頁
    ========================================================= */
+/* 總覽顯示目前用了多少瀏覽器空間（附件越多越大） */
+async function showUsage(){
+  try{ const e=await navigator.storage.estimate(); const el=document.querySelector('.hc-bot .hcrumb'); if(!el||view!=='home') return;
+    el.insertAdjacentHTML('beforeend',`<span class="muted small">　・目前資料與附件約用 ${(e.usage/1048576).toFixed(1)} MB</span>`); }catch(e){}
+}
 function showHome(){
   if(!leave()) return;
   view='home'; setSide('home');
+  setTimeout(showUsage,0);
   const L=live();
   $('#app').innerHTML = `
     ${headHTML('文件追蹤工作台','SUPPLIER DOCUMENT TRACKING','從收件、到期提醒到品質確認，讓每一份文件都有紀錄、不漏更新。','總覽',
@@ -627,7 +638,8 @@ function showList(type){
   const t=TYPES[curType], cnt={}; TABS.forEach(([k])=>cnt[k]=ofType(curType).filter(r=>inTab(r,k)).length);
   $('#app').innerHTML = `
     ${headHTML(t.name, t.eb, t.desc, t.name,
-      `<button class="primary pnew" onclick="openRecord()">＋ 新增${t.name}紀錄</button>
+      `<button class="primary pnew" onclick="pickNewReport()">📄 收到新報告</button>
+       <button class="lite" onclick="openRecord()">＋ 新增${t.name}紀錄</button>
        <button class="lite" onclick="showTrash()">最近刪除（${records.filter(r=>r.deleted).length}）</button>
        <button class="lite" onclick="exportCSV()" title="匯出目前清單（依分頁與篩選）；Excel 可開">匯出報表（Excel）</button>${backupTools()}`)}
     ${kpiHTML(ofType(curType))}
@@ -717,6 +729,63 @@ async function listDelete(){
 /* =========================================================
    單筆紀錄頁
    ========================================================= */
+/* =========================================================
+   收到新報告：舊報告整份存進「歷史報告」，保留 5 年（從那份報告的收件日起算）
+   ========================================================= */
+const HIST_YEARS = 5;
+const histKeep = h => { const k=addMonths(h.receivedDate || (h.archivedAt||today()), HIST_YEARS*12); return h.keepUntil&&h.keepUntil>k ? h.keepUntil : k; };
+function snapshot(r){
+  return {id:'h'+newUid().slice(1), receivedDate:r.receivedDate, dueDate:r.dueDate, period:r.period, qc:r.qc, docNo:r.docNo,
+    testItems:r.testItems, testReq:r.testReq, provide:r.provide, importExpiry:r.importExpiry, note:r.note,
+    rFrom:r.rFrom, rTo:r.rTo, rUnit:r.rUnit, r2From:r.r2From, r2To:r.r2To, files:(r.files||[]).slice(), archivedAt:today()};
+}
+function newReport(uid){
+  if(!leave()) return;
+  const r=records.find(x=>x.uid===uid); if(!r||r.deleted) return;
+  curType=r.docType;
+  cur=JSON.parse(JSON.stringify(r));
+  if(cur.receivedDate || cur.files.length) cur.history.unshift(snapshot(cur));
+  Object.assign(cur, {receivedDate:'', dueDate:'', qc:'pending', files:[], docNo:'', importExpiry:'', importExpiryManual:false, note:''});
+  cur.newReport=true; view='detail'; dirty=true; renderDetail(); window.scrollTo(0,0);
+  flash('舊報告已放進「歷史報告」，填好新報告後按「儲存」');
+}
+/* 清單上方的「📄 收到新報告」：選分類 → 廠商 → 原物料 */
+function pickNewReport(){
+  const cal=curType==='cal', rs=ofType(curType);
+  const m=document.createElement('div'); m.className='modal';
+  m.innerHTML=`<div class="box" role="dialog" aria-modal="true" style="max-width:480px"><div class="mkt" style="font-size:16px;margin-bottom:10px">📄 收到新報告｜${esc(TYPES[curType].name)}</div>
+    ${cal?'':`<label class="f">原料分類（可以不選）</label><select id="nrCat"><option value="">全部分類</option>${CATS.map(c=>`<option>${c}</option>`).join('')}</select>`}
+    <label class="f" style="margin-top:8px">${cal?'校正公司':'廠商'}</label><select id="nrSup"></select>
+    <label class="f" style="margin-top:8px">${cal?'儀器':'原物料'}</label><select id="nrItem"></select>
+    <div class="muted small" id="nrHint" style="margin-top:8px">找不到的話，代表是新的品項，請改按「＋ 新增${esc(TYPES[curType].name)}紀錄」。</div>
+    <div class="row" style="justify-content:flex-end;margin-top:12px"><button id="nrNo">取消</button><button class="primary" id="nrGo">下一步</button></div></div>`;
+  document.body.appendChild(m);
+  const q=s=>m.querySelector(s), byCat=()=>rs.filter(r=>cal||!q('#nrCat').value||r.category===q('#nrCat').value);
+  const fillSup=()=>{ const sups=[...new Set(byCat().map(r=>r.supplier))].sort((a,b)=>a.localeCompare(b,'zh-Hant'));
+    q('#nrSup').innerHTML=sups.length?sups.map(x=>`<option>${esc(x)}</option>`).join(''):'<option value="">（沒有符合的廠商）</option>'; fillItem(); };
+  const fillItem=()=>{ const its=byCat().filter(r=>r.supplier===q('#nrSup').value).sort((a,b)=>itemLabel(a).localeCompare(itemLabel(b),'zh-Hant'));
+    q('#nrItem').innerHTML=its.length?its.map(r=>`<option value="${r.uid}">${esc(itemLabel(r))}${r.receivedDate?`（上次收件 ${fmtDate(r.receivedDate)}）`:'（缺件）'}</option>`).join(''):'<option value="">（沒有品項）</option>'; };
+  if(!cal) q('#nrCat').onchange=fillSup; q('#nrSup').onchange=fillItem; fillSup();
+  q('#nrNo').onclick=()=>m.remove();
+  q('#nrGo').onclick=()=>{ const uid=q('#nrItem').value; if(!uid) return; m.remove(); newReport(uid); };
+}
+/* 歷史報告超過 5 年：移到「最近刪除」（30 天內可還原） */
+function expireHistory(){
+  let n=0; const td=today();
+  records.forEach(r=>(r.history||[]).forEach(h=>{ if(!h.deleted && histKeep(h)<td){ h.deleted=true; h.deletedAt=td; n++; } }));
+  if(n) persist();
+}
+function histHTML(r){
+  const hs=(r.history||[]).filter(h=>!h.deleted);
+  if(!hs.length) return '';
+  return `<div class="card"><h2><span class="no">4</span>歷史報告<span class="muted small" style="font-weight:400">（共 ${hs.length} 份，從收件日起保留 ${HIST_YEARS} 年）</span></h2>
+    <div style="overflow-x:auto"><table><thead><tr><th>收件日期</th><th>到期日</th><th>品質確認</th><th>檢驗項目</th><th>附件</th><th>保存到</th></tr></thead><tbody>
+    ${hs.map(h=>`<tr><td class="nw">${fmtDate(h.receivedDate)||'—'}</td><td class="nw">${fmtDate(h.dueDate)||'—'}</td><td>${qcBadge(h)}</td>
+      <td class="small">${esc(h.testItems||'').replace(/\n/g,'<br>')||'—'}</td>
+      <td>${(h.files||[]).length?`<button class="clipb" onclick="viewAtts('${r.uid}','${h.id}')">📎${h.files.length}</button>`:'—'}</td>
+      <td class="nw small muted">${fmtDate(histKeep(h))}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+}
 function openRecord(id){
   if(id){ const r=records.find(x=>x.uid===id); if(!r||r.deleted) return; cur=JSON.parse(JSON.stringify(r)); }
   else cur=blankRecord(curType);
@@ -752,8 +821,9 @@ function renderDetail(){
       <button onclick="showList()">← 返回${t.name}清單</button>
       <h2 style="margin:0 8px;font-size:18px">${isNew?'新增'+t.name+'紀錄':esc(r.docNo||t.name+'紀錄')}</h2>
       <span id="stBadge"></span><span class="spacer"></span>
-      ${isNew?'':`<button class="danger" onclick="deleteRecord()">刪除此筆</button>`}
+      ${isNew||r.newReport?'':`<button class="primary" onclick="newReport('${r.uid}')">📄 收到新報告</button> <button class="danger" onclick="deleteRecord()">刪除此筆</button>`}
     </div>
+    ${r.newReport?`<div class="notice small" style="background:#fff4e0;color:#7a3d06">📄 <b>正在登錄新報告</b>：上一份報告已放進下方「歷史報告」。請填<b>新的收件日期</b>、按 <b>Ctrl＋V</b> 貼上報告、判定品質，再按「儲存」。不儲存就離開的話，什麼都不會改變。</div>`:''}
     <div class="card">
       <h2><span class="no">1</span>文件資料｜${t.name}</h2>
       <div class="grid">
@@ -795,6 +865,7 @@ function renderDetail(){
         <div class="full"><label class="f">備註</label><textarea data-f="note" oninput="onField(this)">${esc(r.note)}</textarea></div>
       </div>
     </div>
+    ${histHTML(r)}
     <div class="savebar"><div class="in">
       <button class="primary" onclick="saveRecord()">儲存</button>
       <button onclick="showList()">返回清單</button>
@@ -841,15 +912,16 @@ document.addEventListener('paste', e=>{
     .then(()=>flash(`已貼上 ${fs.length} 個附件（記得按「儲存」）`));
 });
 /* 清單上點 📎：直接看附件，不用進編輯頁 */
-async function viewAtts(uid){
+async function viewAtts(uid, hid){
   const r=records.find(x=>x.uid===uid); if(!r) return;
-  const items=await Promise.all((r.files||[]).map(async f=>{ let o=null; try{ o=await fGet(f.id); }catch(e){} return {f,o}; }));
+  const h=hid?(r.history||[]).find(x=>x.id===hid):null, fl=h?h.files:r.files;
+  const items=await Promise.all((fl||[]).map(async f=>{ let o=null; try{ o=await fGet(f.id); }catch(e){} return {f,o}; }));
   const urls=[], m=document.createElement('div'); m.className='modal';
   const body=items.map(({f,o})=>{ if(!o) return `<p class="muted small">⚠️ 找不到「${esc(f.name)}」</p>`;
     const u=URL.createObjectURL(o.blob); urls.push(u);
     return `<div style="margin-bottom:10px"><div class="row"><b class="small">${esc(f.name)}</b><span class="muted small">${fmtSize(f.size)}</span><span class="spacer"></span><a class="small" href="${u}" target="_blank" rel="noopener">在新分頁打開 ↗</a></div>
       ${f.type.startsWith('image/')?`<img src="${u}" alt="">`:`<iframe src="${u}" style="width:100%;height:60vh;border:1px solid var(--line);border-radius:6px"></iframe>`}</div>`; }).join('');
-  m.innerHTML=`<div class="box attv" role="dialog" aria-modal="true"><div class="row" style="margin-bottom:8px"><b>${esc(r.supplier)}｜${esc(itemLabel(r))}</b><span class="spacer"></span><button class="primary" id="attClose">關閉</button></div>${body}</div>`;
+  m.innerHTML=`<div class="box attv" role="dialog" aria-modal="true"><div class="row" style="margin-bottom:8px"><b>${esc(r.supplier)}｜${esc(itemLabel(r))}${h?`｜歷史報告（收件 ${fmtDate(h.receivedDate)||'—'}）`:''}</b><span class="spacer"></span><button class="primary" id="attClose">關閉</button></div>${body}</div>`;
   const close=()=>{ m.remove(); urls.forEach(u=>URL.revokeObjectURL(u)); };
   m.addEventListener('click',e=>{ if(e.target===m) close(); }); m.querySelector('#attClose').onclick=close;
   document.body.appendChild(m);
@@ -897,6 +969,7 @@ function onField(el){
   refreshForm();
 }
 function saveRecord(){
+  delete cur.newReport;
   const r=cur, t=TYPES[r.docType], miss=[];
   if(!r.supplier.trim()) miss.push(t.sup);
   if(!r.item.trim()) miss.push(t.item);
@@ -926,7 +999,9 @@ window.addEventListener('beforeunload', e=>{ if(dirty){ e.preventDefault(); e.re
 /* =========================================================
    最近刪除
    ========================================================= */
-function trashList(){ return records.filter(r=>r.deleted).sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||'')||(b.createdTs||0)-(a.createdTs||0)); }
+function trashList(){
+  const hs=[]; records.forEach(r=>(r.history||[]).forEach(h=>{ if(h.deleted) hs.push({uid:'h:'+r.uid+':'+h.id, hist:true, docType:r.docType, docNo:h.docNo, supplier:r.supplier, item:r.item, itemOther:r.itemOther, deletedAt:h.deletedAt, createdTs:0, recv:h.receivedDate}); }));
+  return records.filter(r=>r.deleted).concat(hs).sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||'')||(b.createdTs||0)-(a.createdTs||0)); }
 function daysLeft(r){ return 30-daysBetween(r.deletedAt||today(),today()); }
 let trashBack='';
 function showTrash(){ if(!leave()) return; trashBack = view==='list' ? curType : ''; view='trash'; setSide('trash'); trashSel=new Set(); renderTrash(); window.scrollTo(0,0); }
@@ -949,7 +1024,7 @@ function renderTrash(){
       </div>
       ${rs.length?`<div style="overflow-x:auto"><table><thead><tr><th></th><th>文件類型</th><th>編號</th><th>刪除日期</th><th>供應商／校正公司</th><th>原料／產品／儀器</th><th>保留</th></tr></thead><tbody>
         ${rs.map(r=>`<tr><td><input type="checkbox" data-id="${esc(r.uid)}" ${trashSel.has(r.uid)?'checked':''} onchange="trashToggle(this)"></td>
-          <td class="small">${esc(TYPES[r.docType].name)}</td><td>${esc(r.docNo)||'—'}</td><td>${fmtDate(r.deletedAt)}</td><td>${esc(r.supplier)}</td><td>${esc(itemLabel(r))}</td><td class="small muted">剩 ${Math.max(daysLeft(r),0)} 天</td></tr>`).join('')}
+          <td class="small">${r.hist?`歷史報告（收件 ${fmtDate(r.recv)||'—'}，已滿 ${HIST_YEARS} 年）<br>`:''}${esc(TYPES[r.docType].name)}</td><td>${esc(r.docNo)||'—'}</td><td>${fmtDate(r.deletedAt)}</td><td>${esc(r.supplier)}</td><td>${esc(itemLabel(r))}</td><td class="small muted">剩 ${Math.max(daysLeft(r),0)} 天</td></tr>`).join('')}
       </tbody></table></div>`:'<div class="empty">目前沒有刪除的紀錄</div>'}
     </div>
     ${pageGuide('trash')}`;
@@ -961,20 +1036,24 @@ function trashRestore(){
   if(!trashSel.size) return;
   const ids=[...trashSel], done=[];
   records.forEach(r=>{ if(ids.includes(r.uid)&&r.deleted){ r.deleted=false; delete r.deletedAt; done.push(r); } });
+  /* 還原的歷史報告：保存期限已過，會在下次打開時再移回來，所以改成從今天起再保留 30 天 */
+  records.forEach(r=>(r.history||[]).forEach(h=>{ if(h.deleted && ids.includes('h:'+r.uid+':'+h.id)){ h.deleted=false; delete h.deletedAt; h.keepUntil=addDays(today(),30); done.push(h); } }));
   if(!persist()){ done.forEach(r=>{ r.deleted=true; r.deletedAt=today(); }); return; }
   trashSel=new Set(); renderTrash(); flash('已還原 '+done.length+' 筆');
 }
 async function trashPerm(){
   const n=trashSel.size; if(!n) return;
   if(!(await ask(`確定要永久刪除選取的 ${n} 筆嗎？永久刪除後無法復原。`))) return;
-  const ids=new Set(trashSel), old=records;
+  const ids=new Set(trashSel), old=records.map(r=>Object.assign({},r,{history:(r.history||[]).slice()}));
   records=records.filter(r=>!ids.has(r.uid));
+  records.forEach(r=>{ r.history=(r.history||[]).filter(h=>!ids.has('h:'+r.uid+':'+h.id)); });
   if(!persist()){ records=old; return; }
   trashSel=new Set(); renderTrash(); cleanupFiles(); flash('已永久刪除 '+n+' 筆');
 }
 function purgeExpired(){
-  const exp=records.filter(r=>r.deleted&&r.deletedAt&&today()>addDays(r.deletedAt,30));
-  if(!exp.length) return;
+  const exp=records.filter(r=>r.deleted&&r.deletedAt&&today()>addDays(r.deletedAt,30)); let hn=0;
+  records.forEach(r=>{ const n0=(r.history||[]).length; r.history=(r.history||[]).filter(h=>!(h.deleted&&h.deletedAt&&today()>addDays(h.deletedAt,30))); hn+=n0-r.history.length; });
+  if(!exp.length&&!hn) return;
   const ids=new Set(exp.map(r=>r.uid)); records=records.filter(r=>!ids.has(r.uid)); persist();
 }
 
@@ -1440,7 +1519,7 @@ async function importContacts(input){
 }
 
 async function backup(){
-  const rs=live(), ids=new Set(rs.flatMap(r=>r.files.map(f=>f.id)));
+  const rs=live(), ids=new Set(rs.flatMap(r=>allFiles(r).map(f=>f.id)));
   let files=[];
   try{
     if(ids.size) flash('正在準備備份（含附件）…');
@@ -1467,6 +1546,7 @@ function restore(input){
       const o=migrate(Object.assign({},r,{deleted:false}));
       if(seen.has(o.uid)) o.uid=newUid();
       o.files=o.files.filter(f=>f&&avail.has(f.id));
+      o.history.forEach(h=>{ h.files=(h.files||[]).filter(f=>f&&avail.has(f.id)); });
       seen.add(o.uid); records.push(o);
     });
     try{
@@ -1486,7 +1566,7 @@ function restore(input){
   catch(e){ alert('注意：目前瀏覽器無法保存資料（可能是無痕模式或已封鎖網站資料），關閉後資料會遺失。'); }
   try{ navigator.storage && navigator.storage.persist && navigator.storage.persist().catch(()=>{}); }catch(e){}
   try{ const lg=document.querySelector('header .logo'); if(lg) $('#sbLogo').src=lg.src; }catch(e){}
-  purgeExpired(); cleanupFiles(); showHome();
+  expireHistory(); purgeExpired(); cleanupFiles(); showHome();
 })();
 </script>
 </body>
