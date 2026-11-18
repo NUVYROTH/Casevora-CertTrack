@@ -821,7 +821,7 @@ function expireHistory(){
 function histHTML(r){
   const hs=(r.history||[]).filter(h=>!h.deleted);
   if(!hs.length) return '';
-  return `<div class="card"><h2><span class="no">4</span>歷史報告<span class="muted small" style="font-weight:400">（共 ${hs.length} 份，從收件日起保留 ${HIST_YEARS} 年）</span></h2>
+  return `<div class="card"><h2><span class="no">${r.docType==='cal'?4:2}</span>歷史報告<span class="muted small" style="font-weight:400">（共 ${hs.length} 份，從收件日起保留 ${HIST_YEARS} 年）</span></h2>
     <div style="overflow-x:auto"><table><thead><tr><th>收件日期</th><th>到期日</th><th>品質確認</th><th>檢驗項目</th><th>附件</th><th>保存到</th></tr></thead><tbody>
     ${hs.map(h=>`<tr><td class="nw">${fmtDate(h.receivedDate)||'—'}</td><td class="nw">${fmtDate(h.dueDate)||'—'}</td><td>${qcBadge(h)}</td>
       <td class="small">${(h.tests&&h.tests.length)?h.tests.map(t=>`${esc(t.name)||'—'}<span class="muted">（${fmtDate(t.receivedDate)||'未收'} → ${fmtDate(t.dueDate)||'—'}）</span>`).join('<br>'):(esc(h.testItems||'').replace(/\n/g,'<br>')||'—')}</td>
@@ -857,6 +857,11 @@ function calFields(r){
 }
 function renderDetail(){
   const r=cur, isNew=!r.uid, t=TYPES[r.docType];
+  const ATT_HTML=`        <div class="full"><label class="f">附件（圖片或 PDF，選填，單檔 20 MB 以內）</label>
+          <input type="file" accept="image/*,application/pdf" multiple onchange="addFiles(this)">
+          <div class="pastebox">📋 也可以直接按 <b>Ctrl＋V</b> 貼上截圖、圖片或 PDF（從檔案總管複製的檔案也行）</div>
+          <div class="muted small" style="margin-top:3px">附件只存在這台電腦的這個瀏覽器裡</div>
+          <div class="atts" id="atts"></div></div>`;
   setSide(r.docType);
   $('#app').innerHTML = `
     ${crumbHTML(`${esc(t.name)} / <b>${isNew?'新增紀錄':'編輯紀錄'}</b>`)}
@@ -876,25 +881,23 @@ function renderDetail(){
         <div><label class="f req">${t.item}</label><input type="text" data-f="item" value="${esc(r.item)}" oninput="onField(this)"></div>
         <div><label class="f">原料分類</label><select data-f="category" onchange="onField(this)"><option value="">未分類</option>${CATS.map(c=>`<option ${r.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
         <div><label class="f">報告提供方式</label><select data-f="provide" onchange="onField(this)"><option value="">未填</option>${PROVIDE.map(c=>`<option ${r.provide===c?'selected':''}>${c}</option>`).join('')}</select></div>
-        <div class="full"><label class="f">檢驗表需求（選填）</label><textarea data-f="testReq" placeholder="例：微生物：腸桿菌科＋沙門氏＋大腸桿" oninput="onField(this)">${esc(r.testReq)}</textarea></div>`}
-        <div class="full"><label class="f">附件（圖片或 PDF，選填，單檔 20 MB 以內）</label>
-          <input type="file" accept="image/*,application/pdf" multiple onchange="addFiles(this)">
-          <div class="pastebox">📋 也可以直接按 <b>Ctrl＋V</b> 貼上截圖、圖片或 PDF（從檔案總管複製的檔案也行）</div>
-          <div class="muted small" style="margin-top:3px">附件只存在這台電腦的這個瀏覽器裡</div>
-          <div class="atts" id="atts"></div></div>
-      </div>
-    </div>
-    ${r.docType!=='cal'?`<div class="card">
-      <h2><span class="no">2</span>檢驗項目與日期</h2>
-      <div class="muted small" style="margin:-6px 0 10px">每個檢驗項目各自有收件日期和更新週期；整筆的狀態看最急的那一行。尚未收到的，收件日期留空。</div>
-      <div id="tests"></div>
-      <div class="row" style="margin-top:8px"><button onclick="addTest()">＋ 增加檢驗項目</button><span class="muted small">選單裡沒有的，選「其他（自己填）」，儲存後會加進常用選項</span></div>
-      <div class="grid" style="margin-top:14px">
+        <div class="full"><label class="f">檢驗表需求（選填）</label><textarea data-f="testReq" placeholder="例：微生物：腸桿菌科＋沙門氏＋大腸桿" oninput="onField(this)">${esc(r.testReq)}</textarea></div>
+        <div class="full"><label class="f">檢驗項目與日期</label>
+          <div class="muted small" style="margin-bottom:6px">每個檢驗項目各自有收件日期和更新週期；整筆的狀態看最急的那一行。尚未收到的，收件日期留空。</div>
+          <div id="tests"></div>
+          <div class="row" style="margin-top:8px"><button onclick="addTest()">＋ 增加檢驗項目</button><span class="muted small">選單裡沒有的，選「其他（自己填）」，儲存後會加進常用選項</span></div></div>
+        <div><label class="f">文件收件狀態（系統依日期自動判斷）</label><div id="stBox" style="padding-top:6px"></div></div>
+        <div><label class="f">品質確認狀態</label>
+          <select data-f="qc" id="inQc" onchange="onField(this)">${Object.entries(QC).map(([k,n])=>`<option value="${k}" ${r.qc===k?'selected':''}>${n}</option>`).join('')}</select>
+          <div class="muted small" id="qcHint" style="margin-top:3px"></div></div>
         <div><label class="f">進口分析／輸入許可效期（選填）</label><input type="date" data-f="importExpiry" value="${esc(r.importExpiry)}" oninput="onField(this)">
           <div class="muted small" style="margin-top:3px">到期前 30 天會提醒</div></div>
-        <div><label class="f">文件收件狀態（系統依日期自動判斷）</label><div id="stBox" style="padding-top:6px"></div></div>
+        ${ATT_HTML}
+        <div class="full"><label class="f">備註</label><textarea data-f="note" oninput="onField(this)">${esc(r.note)}</textarea></div>`}
+        ${r.docType==='cal'?ATT_HTML:''}
       </div>
-    </div>`:`<div class="card">
+    </div>
+    ${r.docType!=='cal'?'':`<div class="card">
       <h2><span class="no">2</span>收件與更新日期</h2>
       <div class="grid">
         <div><label class="f">收件日期</label><input type="date" data-f="receivedDate" id="inRecv" max="${today()}" value="${esc(r.receivedDate)}" oninput="onField(this)">
@@ -906,7 +909,7 @@ function renderDetail(){
         <div><label class="f">文件收件狀態（系統依日期自動判斷）</label><div id="stBox" style="padding-top:6px"></div></div>
       </div>
     </div>`}
-    <div class="card">
+    ${r.docType!=='cal'?'':`<div class="card">
       <h2><span class="no">3</span>品質確認</h2>
       <div class="grid">
         <div><label class="f">品質確認狀態</label>
@@ -914,7 +917,7 @@ function renderDetail(){
           <div class="muted small" id="qcHint" style="margin-top:3px"></div></div>
         <div class="full"><label class="f">備註</label><textarea data-f="note" oninput="onField(this)">${esc(r.note)}</textarea></div>
       </div>
-    </div>
+    </div>`}
     ${histHTML(r)}
     <div class="savebar"><div class="in">
       <button class="primary" onclick="saveRecord()">儲存</button>
