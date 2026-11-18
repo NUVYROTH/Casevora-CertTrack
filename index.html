@@ -192,6 +192,7 @@ td.ac button{padding:4px 10px;font-size:13px}
 .range select{width:auto}
 .range .u{font-weight:700;min-width:28px}
 .range + .range{margin-top:8px}
+.ttab td,.ttab th{vertical-align:middle}.ttab select,.ttab input{min-width:120px}.ttab td button{padding:4px 8px}
 .pastebox{margin-top:6px;border:2px dashed var(--field);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--muted);background:#fbf8f1}
 .clipb{border:1px solid var(--gold);background:#fbf6ec;border-radius:999px;padding:0 7px;font-size:12px;line-height:18px;cursor:pointer}
 .clipb:hover{background:#f3ece0}
@@ -250,6 +251,7 @@ td.ac button{padding:4px 10px;font-size:13px}
     <button data-v="raw" onclick="showList('raw')"><span class="ic">🧪</span>原物料外檢報告</button>
     <button data-v="cal" onclick="showList('cal')"><span class="ic">⚖️</span>儀器校正外檢報告</button>
     <button data-v="contacts" onclick="showContacts()"><span class="ic">📇</span>聯絡清單</button>
+    <button data-v="opts" onclick="showOpts()"><span class="ic">⚙️</span>常用選項</button>
     <button data-v="trash" onclick="showTrash()"><span class="ic">🗑️</span>最近刪除</button>
     <span class="spacer"></span>
     <button data-v="help" onclick="showHelp()"><span class="ic">?</span>使用說明</button>
@@ -263,6 +265,12 @@ td.ac button{padding:4px 10px;font-size:13px}
 <script>
 const KEY = 'casevoraCoaTracker_v2';
 const KEY_C = 'casevoraCoaTracker_contacts_v1';
+const KEY_O = 'casevoraCoaTracker_opts_v1';
+/* 常用選項：檢驗項目下拉清單（只存在這個瀏覽器；下載備份會一起帶走） */
+const DEFAULT_TESTS = ['重金屬','鉛','鎘','砷','汞','農藥殘留','動物用藥殘留','微生物','沙門氏菌','大腸桿菌','總生菌數','品質','PH值','水分','二氧化硫','揮發性鹽基態氮(VBN)','材質','溶出'];
+let OPTS = (()=>{ try{ const o=JSON.parse(localStorage.getItem(KEY_O)); if(o&&Array.isArray(o.tests)) return o; }catch(e){} return {tests:DEFAULT_TESTS.slice()}; })();
+function saveOpts(){ try{ localStorage.setItem(KEY_O, JSON.stringify(OPTS)); return true; }catch(e){ alert('常用選項存不進去，瀏覽器的儲存空間可能已滿。'); return false; } }
+function addOptTests(names){ let n=0; names.map(x=>String(x||'').trim()).filter(Boolean).forEach(x=>{ if(!OPTS.tests.includes(x)){ OPTS.tests.push(x); n++; } }); if(n) saveOpts(); return n; }
 const OLD_KEY = 'casevoraCoaTracker_v1';
 const TYPES = {
   coa: {name:'廠商COA報告',       months:12, lead:3, per:'1y', sup:'供應商名稱', item:'原料或產品名稱', ic:'📄',
@@ -367,7 +375,7 @@ const blobToDataUrl = b => new Promise((ok,no)=>{ const fr=new FileReader(); fr.
 /* ---------- 資料 ---------- */
 function blankRecord(type){
   return {uid:'', docType:type||'coa', docNo:'', supplier:'', item:'', itemOther:'', rFrom:'', rTo:'', rUnit:'', r2From:'', r2To:'',
-          fileLoc:'', files:[], history:[], category:'', period:'', testItems:'', testReq:'', provide:'', importExpiry:'', importKey:'', receivedDate:'', dueDate:'', qc:'pending', note:'', createdAt:'', createdTs:0, updatedAt:''};
+          fileLoc:'', files:[], history:[], tests:[], category:'', period:'', testItems:'', testReq:'', provide:'', importExpiry:'', importKey:'', receivedDate:'', dueDate:'', qc:'pending', note:'', createdAt:'', createdTs:0, updatedAt:''};
 }
 function newUid(){ let u; do{ u='r'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }while(records && records.some(r=>r.uid===u)); return u; }
 /* 舊版（v1）紀錄也能讀：舊編號 COA-001 搬到「文件編號」，儀器名稱不在選單裡的放進「其他」 */
@@ -378,6 +386,13 @@ function migrate(r){
   if(!QC[o.qc]) o.qc='pending';
   if(!Array.isArray(o.files)) o.files=[];
   if(!Array.isArray(o.history)) o.history=[];
+  /* 檢驗項目改成多行（每行有自己的收件日期、週期、到期日）；舊資料的檢驗項目一行一項轉過來，先共用原本的日期 */
+  if(o.docType!=='cal' && !(Array.isArray(r.tests) && r.tests.length)){
+    const lines=String(o.testItems||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    o.tests=(lines.length?lines:['']).map(name=>({id:'t'+newUid().slice(1), name, receivedDate:o.receivedDate, period:o.period, dueDate:o.dueDate}));
+  }
+  if(o.docType==='cal') o.tests=[];
+  syncTests(o);
   if(!PERIODS.some(x=>x[0]===o.period)) o.period=(TYPES[o.docType]||TYPES.coa).per;
   if(o.provide==='隨貨') o.provide='報告書隨貨附';
   /* 修正：新格式匯入時曾把「進口分析＋日期」誤當成進口效期，自動判讀出來的拿掉（手動填的保留） */
@@ -424,9 +439,28 @@ function leadOf(r){
   if(m==null) m = r.receivedDate&&r.dueDate ? daysBetween(r.receivedDate,r.dueDate)/30 : 12;
   return m>=12 ? 3 : 1;
 }
+/* 由檢驗項目各行算出整筆的收件日期（最近一次）與到期日（最早的一個），清單、排序、匯出都用這兩個值 */
+function syncTests(r){
+  if(r.docType==='cal' || !Array.isArray(r.tests) || !r.tests.length) return r;
+  const rec=r.tests.map(t=>t.receivedDate).filter(Boolean).sort(), due=r.tests.filter(t=>t.receivedDate&&t.dueDate).map(t=>t.dueDate).sort();
+  r.receivedDate=rec.length?rec[rec.length-1]:''; r.dueDate=due[0]||''; r.period=(r.tests[0]&&r.tests[0].period)||r.period;
+  r.testItems=r.tests.map(t=>t.name).filter(Boolean).join('\n');
+  return r;
+}
+const testRec = (r,t) => ({docType:r.docType, receivedDate:t.receivedDate, dueDate:t.dueDate, period:t.period||(TYPES[r.docType]||TYPES.coa).per, qc:r.qc});
+/* 整筆的狀態看最急的那一行 */
+function rowsStatus(r){
+  if(r.docType==='cal' || !r.tests || !r.tests.length) return baseStatus(r);
+  let best=null;
+  r.tests.forEach(t=>{ const s=baseStatus(testRec(r,t));
+    if(!best || s.rank<best.s.rank || (s.rank===best.s.rank && (t.dueDate||'9999')<(best.t.dueDate||'9999'))) best={s,t}; });
+  const s=Object.assign({},best.s);
+  if(r.tests.length>1 && best.t.name) s.extra=`${best.t.name}：${s.extra||s.t}`;
+  return s;
+}
 /* 有填進口分析／輸入許可效期時，一起列入判斷 */
 function statusOf(r){
-  const s=baseStatus(r);
+  const s=rowsStatus(r);
   if(!r.importExpiry || s.k==='missing') return s;
   const d=daysBetween(today(),r.importExpiry), add=x=>(s.extra?s.extra+'｜':'')+x;
   if(d<0) return s.k==='late' ? Object.assign({},s,{extra:add(`進口效期已過 ${-d} 天`)}) : {k:'late', t:'尚未更新', c:'s-late', rank:0, extra:`進口效期已過 ${-d} 天`, days:-d};
@@ -515,8 +549,10 @@ function docSteps(k){
           : `<p>按右上角「＋ 新增${t.name}紀錄」${N(1)}，填<b>供應商名稱、原料或產品</b>${N(2)}（有 * 必填），選<b>原料分類</b>${N(3)}。</p><p class="muted small">還沒收到文件時，收件日期留空，狀態會顯示「缺件」，可以先建立當提醒。檢驗項目、檢驗表需求、提供方式、附件都是選填。附件可以直接按 <b>Ctrl＋V</b> 貼上截圖或 PDF。</p>`],
     ['收到新報告（更新）', MK(R('<span></span>',B('📄 收到新報告','d',1)), C('', R('廠商',F('資川 ▾',2)), R(cal?'儀器':'原物料',F(cal?'磅秤 ▾':'黑胡椒粉 ▾',3))), C('歷史報告',R('2024/03/09','📎1','保存到 2029/03/09'))),
       `<p>收到新的一份報告時，按清單上方「<b>📄 收到新報告</b>」${N(1)}，選${cal?'校正公司':'廠商'}${N(2)}、${cal?'儀器':'原物料'}${N(3)}，按「下一步」。</p><p>舊報告會<b>自動存進「歷史報告」</b>，從收件日起保留 5 年；你只要填新的收件日期、Ctrl＋V 貼上新報告、判定品質，再按儲存。</p><p class="muted small">已經打開那一筆時，也可以直接按右上角的「📄 收到新報告」。</p>`],
-    ['收到文件：填日期', MK(C('收件與更新日期', R('收件日期',F('2026/11/01',1)), R('更新週期',F(`${t.per==='4m'?'4 個月':'1 年'} ▾`,2)), R('到期日',F(t.per==='4m'?'2027/03/01':'2027/11/01',3))), C('', R('文件收件狀態',ST('已更新','s-ok')))),
-      `<p>填<b>收件日期</b>${N(1)}（不能晚於今天），選<b>更新週期</b>${N(2)}，<b>到期日</b>${N(3)}會自動算出來，也可以自己改。</p><p class="muted small">文件狀態由系統依日期自動判斷，不用自己選。${cal?'':'有進口分析或輸入許可的可以填「進口效期」，到期前 30 天提醒。'}</p>`],
+    cal ? ['收到文件：填日期', MK(C('收件與更新日期', R('收件日期',F('2026/11/01',1)), R('更新週期',F('1 年 ▾',2)), R('到期日',F('2027/11/01',3))), C('', R('文件收件狀態',ST('已更新','s-ok')))),
+      `<p>填<b>收件日期</b>${N(1)}（不能晚於今天），選<b>更新週期</b>${N(2)}，<b>到期日</b>${N(3)}會自動算出來，也可以自己改。</p><p class="muted small">文件狀態由系統依日期自動判斷，不用自己選。</p>`]
+    : ['檢驗項目與日期', MK(C('檢驗項目與日期', R(F('鉛＋鎘 ▾',1),F('2026/05/29',2),F('1 年 ▾'),ST('已更新','s-ok')), R(F('農藥殘留 ▾'),F('2026/03/01'),F('1 年 ▾'),ST('需要更新','s-need'))), R(B('＋ 增加檢驗項目','',3),'')),
+      `<p>每一行是一個檢驗項目：從<b>常用選項</b>${N(1)}選（沒有的選「其他（自己填）」），填<b>收件日期</b>${N(2)}、選週期，<b>到期日自動算</b>。</p><p>同一個原物料有好幾份報告，就按「<b>＋ 增加檢驗項目</b>」${N(3)}多加幾行。整筆的狀態看<b>最急的那一行</b>。</p><p class="muted small">自己填的新項目，儲存後會加進左邊「⚙️ 常用選項」。</p>`],
     ['品質確認，然後儲存', MK(C('品質確認', R('品質確認狀態',F('合格 ▾',1))), R(B('儲存','d',2),B('返回清單'),'<span style="color:#b45309">● 有尚未儲存的修改</span>')),
       `<p>由品管判定<b>合格</b>或<b>不合格</b>${N(1)}（不合格會變成「需要更新」），最後按左下角「<b>儲存</b>」${N(2)}。</p><p class="muted small">還沒儲存就離開，會先問你一次。</p>`],
     ['找到要處理的文件', MK(C('', R(N(1)+'<span>'+B('待辦','d')+' '+B('缺件')+' '+B('逾期')+' '+B('全部')+'</span>'), R(F(cal?'搜尋 儀器／校正公司':'搜尋 供應商／原料',2)), cal?'':R(F('全部原料分類 ▾',3)))),
@@ -549,6 +585,12 @@ const PAGE_GUIDE = {
     ['個資提醒', MK(C('', R('聯絡人',F('業務 王小明')), R('手機',F('0912-***-***',1)))),
       `<p>「聯絡人」「手機」${N(1)}是<b>個人資料</b>，只供自己使用。</p><p>截圖、寄送 Excel 或備份檔給別人之前，<b>先遮蔽或刪除這兩欄</b>。</p>`]
   ],
+  opts: ()=>[
+    ['新增、排序、刪除', MK(C('', R(F('例：二硫代胺基甲酸鹽',1),B('新增','d')), R('鉛',B('↑','',2),B('刪除','r',3)))),
+      `<p>輸入名稱按「<b>新增</b>」${N(1)}；用 ↑↓${N(2)} 調整在下拉選單的順序；不要的按「<b>刪除</b>」${N(3)}。</p><p class="muted small">刪除選項不會改到已經存好的紀錄。</p>`],
+    ['自動加入', MK(C('', R(F('其他（自己填） ▾',1)), R(F('二硫代胺基甲酸鹽')), R('<span></span>',B('儲存','d',2)))),
+      `<p>在檢驗項目選「<b>其他（自己填）</b>」${N(1)}打字，按「<b>儲存</b>」${N(2)}後，這個項目就會自動加進常用選項，下次直接選。</p>`]
+  ],
   trash: ()=>[
     ['救回刪錯的紀錄', MK(C('最近刪除', R('<span>☑ 測試油品行</span>','剩 28 天')), R(B('全選','',1),B('還原','',2))),
       `<p>勾選要救回的紀錄（或按「<b>全選</b>」${N(1)}），再按「<b>還原</b>」${N(2)}，就會回到原本的清單。</p>`],
@@ -556,7 +598,7 @@ const PAGE_GUIDE = {
       `<p>確定不要的，勾選後按「<b>永久刪除</b>」${N(1)}，會再問一次；<b>永久刪除後無法復原</b>。</p><p class="muted small">保留超過 30 天的，會在下次打開工具時自動永久刪除。</p>`]
   ]
 };
-const GUIDE_TITLE={home:'總覽',coa:'廠商COA報告',raw:'原物料外檢報告',cal:'儀器校正外檢報告',contacts:'聯絡清單',trash:'最近刪除'};
+const GUIDE_TITLE={opts:'常用選項',home:'總覽',coa:'廠商COA報告',raw:'原物料外檢報告',cal:'儀器校正外檢報告',contacts:'聯絡清單',trash:'最近刪除'};
 function pageGuide(key, forceOpen){
   const steps=PAGE_GUIDE[key](); let open=!!forceOpen;
   if(!forceOpen){ try{ open=localStorage.getItem('casevoraCoaTracker_guide_'+key)==='1'; }catch(e){} }
@@ -683,7 +725,7 @@ function renderTable(){
       <td onclick="event.stopPropagation()"><input type="checkbox" data-id="${esc(r.uid)}" ${listSel.has(r.uid)?'checked':''} onchange="listToggle(this)" aria-label="勾選"></td>
       ${cal
         ? `<td>${esc(itemLabel(r))}${clip(r)}${no(r)}</td><td>${statusBadge(r)}</td><td>${esc(rangeText(r))||'—'}</td><td>${esc(r.supplier)}</td>`
-        : `<td>${esc(r.supplier)}${clip(r)}${no(r)}</td><td>${statusBadge(r)}</td><td>${esc(r.item)}${r.category?`<span class="st-sub">${esc(r.category)}</span>`:''}</td>`}
+        : `<td>${esc(r.supplier)}${clip(r)}${no(r)}</td><td>${statusBadge(r)}</td><td>${esc(r.item)}${r.category||(r.tests||[]).length>1?`<span class="st-sub">${[r.category,(r.tests||[]).length>1?r.tests.length+' 個檢驗項目':''].filter(Boolean).join('・')}</span>`:''}</td>`}
       <td class="nw">${r.receivedDate?fmtDate(r.receivedDate):'—'}</td><td class="nw">${r.dueDate?fmtDate(r.dueDate):'—'}</td>
       <td>${qcBadge(r)}</td>
       <td class="ac" onclick="event.stopPropagation()"><button onclick="openRecord('${r.uid}')">編輯</button> <button onclick="deleteOne('${r.uid}')">刪除</button></td></tr>`).join('')}
@@ -737,7 +779,7 @@ const histKeep = h => { const k=addMonths(h.receivedDate || (h.archivedAt||today
 function snapshot(r){
   return {id:'h'+newUid().slice(1), receivedDate:r.receivedDate, dueDate:r.dueDate, period:r.period, qc:r.qc, docNo:r.docNo,
     testItems:r.testItems, testReq:r.testReq, provide:r.provide, importExpiry:r.importExpiry, note:r.note,
-    rFrom:r.rFrom, rTo:r.rTo, rUnit:r.rUnit, r2From:r.r2From, r2To:r.r2To, files:(r.files||[]).slice(), archivedAt:today()};
+    rFrom:r.rFrom, rTo:r.rTo, rUnit:r.rUnit, r2From:r.r2From, r2To:r.r2To, files:(r.files||[]).slice(), tests:JSON.parse(JSON.stringify(r.tests||[])), archivedAt:today()};
 }
 function newReport(uid){
   if(!leave()) return;
@@ -745,7 +787,8 @@ function newReport(uid){
   curType=r.docType;
   cur=JSON.parse(JSON.stringify(r));
   if(cur.receivedDate || cur.files.length) cur.history.unshift(snapshot(cur));
-  Object.assign(cur, {receivedDate:'', dueDate:'', qc:'pending', files:[], docNo:'', importExpiry:'', importExpiryManual:false, note:''});
+  if(cur.docType==='cal') Object.assign(cur, {receivedDate:'', dueDate:''});
+  Object.assign(cur, {qc:'pending', files:[], docNo:'', importExpiry:'', importExpiryManual:false, note:''});
   cur.newReport=true; view='detail'; dirty=true; renderDetail(); window.scrollTo(0,0);
   flash('舊報告已放進「歷史報告」，填好新報告後按「儲存」');
 }
@@ -781,14 +824,14 @@ function histHTML(r){
   return `<div class="card"><h2><span class="no">4</span>歷史報告<span class="muted small" style="font-weight:400">（共 ${hs.length} 份，從收件日起保留 ${HIST_YEARS} 年）</span></h2>
     <div style="overflow-x:auto"><table><thead><tr><th>收件日期</th><th>到期日</th><th>品質確認</th><th>檢驗項目</th><th>附件</th><th>保存到</th></tr></thead><tbody>
     ${hs.map(h=>`<tr><td class="nw">${fmtDate(h.receivedDate)||'—'}</td><td class="nw">${fmtDate(h.dueDate)||'—'}</td><td>${qcBadge(h)}</td>
-      <td class="small">${esc(h.testItems||'').replace(/\n/g,'<br>')||'—'}</td>
+      <td class="small">${(h.tests&&h.tests.length)?h.tests.map(t=>`${esc(t.name)||'—'}<span class="muted">（${fmtDate(t.receivedDate)||'未收'} → ${fmtDate(t.dueDate)||'—'}）</span>`).join('<br>'):(esc(h.testItems||'').replace(/\n/g,'<br>')||'—')}</td>
       <td>${(h.files||[]).length?`<button class="clipb" onclick="viewAtts('${r.uid}','${h.id}')">📎${h.files.length}</button>`:'—'}</td>
       <td class="nw small muted">${fmtDate(histKeep(h))}</td></tr>`).join('')}
     </tbody></table></div></div>`;
 }
 function openRecord(id){
   if(id){ const r=records.find(x=>x.uid===id); if(!r||r.deleted) return; cur=JSON.parse(JSON.stringify(r)); }
-  else cur=blankRecord(curType);
+  else { cur=blankRecord(curType); if(curType!=='cal') cur.tests=[{id:'t'+newUid().slice(1), name:'', receivedDate:'', period:TYPES[curType].per, dueDate:''}]; }
   view='detail'; dirty=false; renderDetail(); window.scrollTo(0,0);
 }
 function unitControl(r){
@@ -823,7 +866,7 @@ function renderDetail(){
       <span id="stBadge"></span><span class="spacer"></span>
       ${isNew||r.newReport?'':`<button class="primary" onclick="newReport('${r.uid}')">📄 收到新報告</button> <button class="danger" onclick="deleteRecord()">刪除此筆</button>`}
     </div>
-    ${r.newReport?`<div class="notice small" style="background:#fff4e0;color:#7a3d06">📄 <b>正在登錄新報告</b>：上一份報告已放進下方「歷史報告」。請填<b>新的收件日期</b>、按 <b>Ctrl＋V</b> 貼上報告、判定品質，再按「儲存」。不儲存就離開的話，什麼都不會改變。</div>`:''}
+    ${r.newReport?`<div class="notice small" style="background:#fff4e0;color:#7a3d06">📄 <b>正在登錄新報告</b>：上一份報告已放進下方「歷史報告」。${r.docType==='cal'?'請填<b>新的收件日期</b>':'在下方表格，<b>只改這次有新報告的檢驗項目</b>的收件日期（沒更新的不用動）'}、按 <b>Ctrl＋V</b> 貼上報告、判定品質，再按「儲存」。不儲存就離開的話，什麼都不會改變。</div>`:''}
     <div class="card">
       <h2><span class="no">1</span>文件資料｜${t.name}</h2>
       <div class="grid">
@@ -833,7 +876,6 @@ function renderDetail(){
         <div><label class="f req">${t.item}</label><input type="text" data-f="item" value="${esc(r.item)}" oninput="onField(this)"></div>
         <div><label class="f">原料分類</label><select data-f="category" onchange="onField(this)"><option value="">未分類</option>${CATS.map(c=>`<option ${r.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
         <div><label class="f">報告提供方式</label><select data-f="provide" onchange="onField(this)"><option value="">未填</option>${PROVIDE.map(c=>`<option ${r.provide===c?'selected':''}>${c}</option>`).join('')}</select></div>
-        <div class="full"><label class="f">檢驗項目（選填）</label><textarea data-f="testItems" placeholder="例：動物用藥 48＋沙門氏" oninput="onField(this)">${esc(r.testItems)}</textarea></div>
         <div class="full"><label class="f">檢驗表需求（選填）</label><textarea data-f="testReq" placeholder="例：微生物：腸桿菌科＋沙門氏＋大腸桿" oninput="onField(this)">${esc(r.testReq)}</textarea></div>`}
         <div class="full"><label class="f">附件（圖片或 PDF，選填，單檔 20 MB 以內）</label>
           <input type="file" accept="image/*,application/pdf" multiple onchange="addFiles(this)">
@@ -842,7 +884,17 @@ function renderDetail(){
           <div class="atts" id="atts"></div></div>
       </div>
     </div>
-    <div class="card">
+    ${r.docType!=='cal'?`<div class="card">
+      <h2><span class="no">2</span>檢驗項目與日期</h2>
+      <div class="muted small" style="margin:-6px 0 10px">每個檢驗項目各自有收件日期和更新週期；整筆的狀態看最急的那一行。尚未收到的，收件日期留空。</div>
+      <div id="tests"></div>
+      <div class="row" style="margin-top:8px"><button onclick="addTest()">＋ 增加檢驗項目</button><span class="muted small">選單裡沒有的，選「其他（自己填）」，儲存後會加進常用選項</span></div>
+      <div class="grid" style="margin-top:14px">
+        <div><label class="f">進口分析／輸入許可效期（選填）</label><input type="date" data-f="importExpiry" value="${esc(r.importExpiry)}" oninput="onField(this)">
+          <div class="muted small" style="margin-top:3px">到期前 30 天會提醒</div></div>
+        <div><label class="f">文件收件狀態（系統依日期自動判斷）</label><div id="stBox" style="padding-top:6px"></div></div>
+      </div>
+    </div>`:`<div class="card">
       <h2><span class="no">2</span>收件與更新日期</h2>
       <div class="grid">
         <div><label class="f">收件日期</label><input type="date" data-f="receivedDate" id="inRecv" max="${today()}" value="${esc(r.receivedDate)}" oninput="onField(this)">
@@ -851,11 +903,9 @@ function renderDetail(){
           <div class="muted small" style="margin-top:3px">選「自訂日期」時，請直接填右邊的日期</div></div>
         <div><label class="f">應提供或更新日期（下次要更新的日子）</label><input type="date" class="dl-input" data-f="dueDate" id="inDue" value="${esc(r.dueDate)}" oninput="onField(this)">
           <div class="dl-hint" id="dueHint"></div><div class="ferr" id="dueErr"></div></div>
-        ${r.docType==='cal'?'':`<div><label class="f">進口分析／輸入許可效期（選填）</label><input type="date" data-f="importExpiry" value="${esc(r.importExpiry)}" oninput="onField(this)">
-          <div class="muted small" style="margin-top:3px">到期前 30 天會提醒</div></div>`}
         <div><label class="f">文件收件狀態（系統依日期自動判斷）</label><div id="stBox" style="padding-top:6px"></div></div>
       </div>
-    </div>
+    </div>`}
     <div class="card">
       <h2><span class="no">3</span>品質確認</h2>
       <div class="grid">
@@ -872,7 +922,7 @@ function renderDetail(){
       <span id="dirtyMark"></span><span class="spacer"></span>
       <span class="muted small" id="savedAt">${r.updatedAt?'最後儲存：'+esc(r.updatedAt):'尚未儲存'}</span>
     </div></div>`;
-  refreshForm(); renderAtts();
+  renderTests(); refreshForm(); renderAtts();
 }
 async function renderAtts(){
   const box=$('#atts'); if(!box||!cur) return;
@@ -931,6 +981,51 @@ function removeAtt(id){
   cur.files=cur.files.filter(f=>f.id!==id); dirty=true; refreshForm(); renderAtts();
 }
 
+/* ---------- 檢驗項目表格 ---------- */
+function testNameSel(t,i){
+  const opts=OPTS.tests.slice(); if(t.name && !opts.includes(t.name) && !t.other) opts.unshift(t.name);
+  return `<select data-ti="${i}" data-tf="nameSel" onchange="onTest(this)"><option value="">請選擇</option>${opts.map(o=>`<option ${!t.other&&t.name===o?'selected':''}>${esc(o)}</option>`).join('')}<option value="__other" ${t.other?'selected':''}>其他（自己填）</option></select>
+    ${t.other?`<input type="text" data-ti="${i}" data-tf="name" value="${esc(t.name)}" placeholder="輸入檢驗項目" style="margin-top:4px" oninput="onTest(this)">`:''}`;
+}
+function renderTests(){
+  const box=$('#tests'); if(!box||!cur) return;
+  const ts=cur.tests||[];
+  box.innerHTML = ts.length ? `<div style="overflow-x:auto"><table class="ttab"><thead><tr><th style="min-width:180px">檢驗項目</th><th>收件日期</th><th>更新週期</th><th>到期日</th><th>狀態</th><th></th></tr></thead><tbody>
+    ${ts.map((t,i)=>{ const bad=testErr(t);
+      return `<tr><td>${testNameSel(t,i)}</td>
+      <td><input type="date" data-ti="${i}" data-tf="receivedDate" max="${today()}" value="${esc(t.receivedDate)}" oninput="onTest(this)" class="${bad.recv?'bad':''}"></td>
+      <td><select data-ti="${i}" data-tf="period" onchange="onTest(this)">${PERIODS.map(([k,n])=>`<option value="${k}" ${(t.period||TYPES[cur.docType].per)===k?'selected':''}>${n}</option>`).join('')}</select></td>
+      <td><input type="date" class="dl-input ${bad.due?'bad':''}" data-ti="${i}" data-tf="dueDate" value="${esc(t.dueDate)}" ${t.receivedDate?'':'disabled'} oninput="onTest(this)"></td>
+      <td id="tst${i}">${(()=>{ const x=baseStatus(testRec(cur,t)); return `<span class="badge ${x.c}">${x.t}</span>${x.extra?`<span class="st-sub">${esc(x.extra)}</span>`:''}`; })()}</td>
+      <td><button class="danger" title="刪除這一行" onclick="delTest(${i})">🗑</button></td></tr>
+      ${bad.recv||bad.due?`<tr><td colspan="6" class="ferr" style="border:0;padding-top:0">${esc(bad.recv||bad.due)}</td></tr>`:''}`; }).join('')}
+    </tbody></table></div>` : '<div class="muted small">還沒有檢驗項目，按下方「＋ 增加檢驗項目」。</div>';
+}
+function testErr(t){
+  return { recv: t.receivedDate && t.receivedDate>today() ? '收件日期不能晚於今天' : '',
+           due: t.receivedDate && !t.dueDate ? '請填寫到期日' : (t.receivedDate && t.dueDate && t.dueDate<t.receivedDate ? '到期日不能早於收件日期' : '') };
+}
+function onTest(el){
+  const i=+el.dataset.ti, f=el.dataset.tf, t=cur.tests[i]; if(!t) return;
+  const rr=testRec(cur,t), oldAuto=autoOf(rr);
+  if(f==='nameSel'){ if(el.value==='__other'){ t.other=true; t.name=''; } else { t.other=false; t.name=el.value; } dirty=true; renderTests(); refreshForm(); return; }
+  t[f]=el.value; dirty=true;
+  if(f==='receivedDate'||f==='period'){
+    const nr=testRec(cur,t);
+    if(!t.receivedDate) t.dueDate='';
+    else if(f==='period' ? monthsOf(nr) : (!t.dueDate || t.dueDate===oldAuto)) t.dueDate=autoOf(nr)||t.dueDate;
+    const d=document.querySelector(`[data-ti="${i}"][data-tf="dueDate"]`); if(d){ d.value=t.dueDate; d.disabled=!t.receivedDate; }
+  }
+  /* 只更新這一行的狀態，不重畫整張表（打字時游標才不會跑掉） */
+  const x=baseStatus(testRec(cur,t)), c=$('#tst'+i); if(c) c.innerHTML=`<span class="badge ${x.c}">${x.t}</span>${x.extra?`<span class="st-sub">${esc(x.extra)}</span>`:''}`;
+  refreshForm();
+}
+function addTest(){ cur.tests.push({id:'t'+newUid().slice(1), name:'', receivedDate:'', period:TYPES[cur.docType].per, dueDate:''}); dirty=true; renderTests(); refreshForm(); }
+async function delTest(i){
+  const t=cur.tests[i]; if(!t) return;
+  if((t.name||t.receivedDate) && !(await ask(`確定要刪除「${t.name||'這一行'}」嗎？（按「儲存」後才會生效）`))) return;
+  cur.tests.splice(i,1); dirty=true; renderTests(); refreshForm();
+}
 function recvError(r){ return r.receivedDate && r.receivedDate > today() ? '收件日期不能晚於今天' : ''; }
 function dueError(r){
   if(r.receivedDate && !r.dueDate) return '請填寫應提供或更新日期';
@@ -939,6 +1034,14 @@ function dueError(r){
 }
 function refreshForm(){
   const r=cur, t=TYPES[r.docType];
+  if(r.docType!=='cal'){
+    syncTests(r);
+    const qc=$('#inQc'), any=r.tests.some(x=>x.receivedDate); qc.disabled=!any; if(!any) r.qc='pending'; if(qc.value!==r.qc) qc.value=r.qc;
+    $('#qcHint').textContent = any ? '' : '（收到文件後才能判定品質）';
+    $('#stBadge').innerHTML = statusBadge(r); $('#stBox').innerHTML = statusBadge(r);
+    $('#dirtyMark').innerHTML = dirty ? '<span class="dirty">● 有尚未儲存的修改</span>' : '';
+    return;
+  }
   const due=$('#inDue'); due.disabled=!r.receivedDate; if(due.value!==r.dueDate) due.value=r.dueDate;
   $('#dueHint').textContent = !r.receivedDate ? '（收到文件、填寫收件日期後，會自動帶出預設日期）'
     : monthsOf(r) ? `（預設：收件日期＋${perLabel(r)}，可自行修改；到期前 ${leadOf(r)} 個月開始顯示「需要更新」）`
@@ -955,6 +1058,7 @@ function onField(el){
   cur[f]=el.value; dirty=true;
   if(f==='period' && cur.receivedDate && monthsOf(cur)) cur.dueDate=autoOf(cur);
   if(f==='importExpiry') cur.importExpiryManual=true;
+  if(f==='qc' && cur.docType!=='cal') renderTests();
   if(f==='receivedDate'){
     if(cur.receivedDate && (!cur.dueDate || cur.dueDate===oldAuto)) cur.dueDate=autoOf(cur);
     if(!cur.receivedDate){ cur.dueDate=''; cur.qc='pending'; }
@@ -975,8 +1079,18 @@ function saveRecord(){
   if(!r.item.trim()) miss.push(t.item);
   else if(r.item==='其他' && !r.itemOther.trim()) miss.push('儀器名稱（其他）');
   if(miss.length){ alert('請先填寫：'+miss.join('、')); return; }
-  if(recvError(r)){ const el=$('#inRecv'); el.scrollIntoView({block:'center'}); el.focus(); alert('收件日期不能晚於今天'); return; }
-  if(dueError(r)){ const el=$('#inDue'); el.scrollIntoView({block:'center'}); el.focus(); return; }
+  if(r.docType!=='cal'){
+    r.tests=r.tests.filter(x=>x.name||x.receivedDate||x.dueDate);
+    const noName=r.tests.findIndex(x=>!x.name), bad=r.tests.findIndex(x=>{ const e=testErr(x); return e.recv||e.due; });
+    if(noName>=0){ renderTests(); alert(`第 ${noName+1} 行還沒選檢驗項目。`); return; }
+    if(bad>=0){ renderTests(); const e=testErr(r.tests[bad]); alert(`「${r.tests[bad].name}」：${e.recv||e.due}`); return; }
+    const added=addOptTests(r.tests.filter(x=>x.other).map(x=>x.name)); r.tests.forEach(x=>delete x.other);
+    if(added) flash(`已把 ${added} 個新的檢驗項目加進常用選項`);
+    syncTests(r);
+  } else {
+    if(recvError(r)){ const el=$('#inRecv'); el.scrollIntoView({block:'center'}); el.focus(); alert('收件日期不能晚於今天'); return; }
+    if(dueError(r)){ const el=$('#inDue'); el.scrollIntoView({block:'center'}); el.focus(); return; }
+  }
   const isNew=!r.uid;
   if(isNew){ r.uid=newUid(); r.createdAt=new Date().toLocaleString('zh-TW'); r.createdTs=Date.now(); }
   r.updatedAt=new Date().toLocaleString('zh-TW');
@@ -985,7 +1099,7 @@ function saveRecord(){
   if(!persist()){ records=backupList; if(isNew) r.uid=''; return; }
   dirty=false; cleanupFiles();
   if(isNew){ showList(); flash('已儲存'); return; }
-  $('#savedAt').textContent='最後儲存：'+r.updatedAt; refreshForm(); flash('已儲存');
+  $('#savedAt').textContent='最後儲存：'+r.updatedAt; renderTests(); refreshForm(); flash('已儲存');
 }
 async function deleteRecord(){
   if(!(await ask('確定要刪除嗎？'))) return;
@@ -1068,7 +1182,7 @@ function exportCSV(){
     '文件收件狀態','狀態說明','品質確認狀態','附件數','備註','最後儲存'];
   const rows=rs.map(r=>{ const s=statusOf(r);
     return [r.docNo,TYPES[r.docType].name, cal?itemLabel(r):r.supplier, cal?rangeText(r):r.item, ...(cal?[r.supplier]:[r.category]),
-      r.receivedDate,perLabel(r),r.dueDate, ...(cal?[]:[r.importExpiry,r.testItems,r.testReq,r.provide]),
+      r.receivedDate,perLabel(r),r.dueDate, ...(cal?[]:[r.importExpiry,testsText(r),r.testReq,r.provide]),
       s.t,s.extra||'',QC[r.qc],(r.files||[]).length,r.note,r.updatedAt]; });
   const csv=[head,...rows].map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
   download('﻿'+csv, `${curType}_report_${today()}.csv`, 'text/csv;charset=utf-8');
@@ -1110,11 +1224,12 @@ function sheetXml(title, head, rows, widths, filter=true){
 }
 function sortForReport(rs){ return rs.slice().sort((a,b)=>{ const sa=statusOf(a), sb=statusOf(b);
   if(sa.rank!==sb.rank) return sa.rank-sb.rank; return (a.dueDate||'9999').localeCompare(b.dueDate||'9999'); }); }
+const testsText = r => (r.docType!=='cal' && (r.tests||[]).length) ? r.tests.map(t=>`${t.name}（收件 ${fmtDate(t.receivedDate)||'未收'}，到期 ${fmtDate(t.dueDate)||'—'}）`).join('\n') : (r.testItems||'');
 function recRow(r, cols){
   const s=statusOf(r), left=r.dueDate&&r.receivedDate ? daysBetween(today(),r.dueDate) : '';
   const m={type:TYPES[r.docType].name, no:r.docNo, sup:r.supplier, item:r.docType==='cal'?itemLabel(r):r.item, range:rangeText(r),
     recv:fmtDate(r.receivedDate), due:fmtDate(r.dueDate), left, st:{v:s.t,s:XS[s.k]}, extra:s.extra||'', qc:{v:QC[r.qc],s:XQ[r.qc]},
-    files:(r.files||[]).length, note:r.note, upd:r.updatedAt, cat:r.category, per:perLabel(r), ti:r.testItems, tr:r.testReq, pv:r.provide, imp:fmtDate(r.importExpiry)};
+    files:(r.files||[]).length, note:r.note, upd:r.updatedAt, cat:r.category, per:perLabel(r), tr:r.testReq, pv:r.provide, imp:fmtDate(r.importExpiry), ti:testsText(r)};
   return cols.map(k=>m[k]);
 }
 const COLS={
@@ -1324,17 +1439,18 @@ function planImportV2(sheets){
         if(ds.length) dues=ds; else { const p=parsePeriod(t); if(p.period) per=p.period; else { note.push('原報告期限：'+t); reasons.push(`報告期限「${t.replace(/\n/g,' ')}」看不懂，先用預設週期`); } }
       }
       const lines=ti.split('\n').map(x=>x.trim()).filter(Boolean);
-      const parts = dues.length>1 ? dues.map((d,i)=>({due:d, ti: lines.length===dues.length ? lines[i] : ti})) : [{due:dues[0]||'', ti}];
-      if(dues.length>1){ plan.split++; if(lines.length!==dues.length) reasons.push(`有 ${dues.length} 個報告期限，但檢驗項目不是 ${dues.length} 行，兩筆都放了全部檢驗項目`); }
-      parts.forEach((pt,pi)=>{
-        const r=Object.assign(blankRecord(kind), {category:cat, item:noSuiHuo(item), supplier:noSuiHuo(ven), receivedDate:recv, testItems:noSuiHuo(pt.ti), testReq:str(c(iReq)),
-          importExpiry:'', provide:parseProvide([ven,pt.ti,...extra].join(' ')), importKey:`v2#${sh.name}#${ri+1}#${pi}`});
-        /* 新格式的「檢驗項目」欄沒有標明是進口效期，「進口分析20250704」可能只是分析日期，所以不自動當成效期 */
-        if(pt.due){ r.period='custom'; r.dueDate=pt.due; } else { r.period=per||TYPES[kind].per; r.dueDate=autoOf(r); }
-        if(!r.supplier){ r.supplier='（未填廠商）'; plan.noVendor++; }
-        r.note=[`【Excel 匯入：${where}${parts.length>1?`（第 ${pi+1} 個期限）`:''}】`, ...note].join('\n');
-        plan.recs.push(r); n++;
-      });
+      /* 每一行檢驗項目＝表格的一行；兩個期限而且剛好兩行時，各自對應自己的到期日 */
+      if(dues.length>1){ plan.split++; if(lines.length!==dues.length) reasons.push(`有 ${dues.length} 個報告期限，但檢驗項目不是 ${dues.length} 行，先都用最早的期限`); }
+      const names=(lines.length?lines:['']).map(noSuiHuo);
+      const tests=names.map((nm,k)=>{ const d=dues.length>1&&lines.length===dues.length?dues[k]:(dues.length?dues.slice().sort()[0]:'');
+        const t={id:'t'+newUid().slice(1), name:nm, receivedDate:recv, period:d?'custom':(per||TYPES[kind].per), dueDate:d};
+        if(!d) t.dueDate=autoOf(testRec({docType:kind},t)); return t; });
+      const r=Object.assign(blankRecord(kind), {category:cat, item:noSuiHuo(item), supplier:noSuiHuo(ven), receivedDate:recv, tests, testReq:str(c(iReq)),
+        importExpiry:'', provide:parseProvide([ven,ti,...extra].join(' ')), importKey:`v2#${sh.name}#${ri+1}#0`});
+      /* 新格式的「檢驗項目」欄沒有標明是進口效期，「進口分析20250704」可能只是分析日期，所以不自動當成效期 */
+      if(!r.supplier){ r.supplier='（未填廠商）'; plan.noVendor++; }
+      r.note=[`【Excel 匯入：${where}】`, ...note].join('\n');
+      syncTests(r); plan.recs.push(r); n++;
       if(reasons.length) plan.flags.push({where, item, type:TYPES[kind].name, reasons});
     }
     plan.sheets.push({name:sh.name, n});
@@ -1361,7 +1477,7 @@ function showImportPreview(){
     <div class="ptitle" style="margin-bottom:12px"><h1>匯入預覽</h1><div class="eyebrow">IMPORT PREVIEW</div>
       <span class="muted">檔案：${esc(P.file)}。<b>還沒有匯入</b>，請先確認下面的內容。</span></div>
     <div class="kpis">
-      <div class="kpi"><span class="kic" aria-hidden="true">${KIC.doc}</span><div class="l">預計匯入</div><div class="n">${P.recs.length}<small>筆</small></div><div class="d">${P.split?`其中 ${P.split} 個品項有兩個期限，拆成兩筆`:'按「確認匯入」後選擇取代或加在後面'}</div></div>
+      <div class="kpi"><span class="kic" aria-hidden="true">${KIC.doc}</span><div class="l">預計匯入</div><div class="n">${P.recs.length}<small>筆</small></div><div class="d">${P.split?`其中 ${P.split} 個品項有兩個期限，放在同一筆的兩行`:'按「確認匯入」後選擇取代或加在後面'}</div></div>
       <div class="kpi info"><span class="kic kin" aria-hidden="true">${KIC.doc}</span><div class="l">廠商COA報告</div><div class="n">${by('coa')}<small>筆</small></div><div class="d">${P.v2?'廠商提供的報告':'來自「廠商報告」欄'}</div></div>
       <div class="kpi info"><span class="kic kin" aria-hidden="true">${KIC.doc}</span><div class="l">原物料外檢報告</div><div class="n">${by('raw')}<small>筆</small></div><div class="d">${P.v2?'自檢／自驗 SGS':'來自「外驗日期」與自驗 SGS'}</div></div>
       <div class="kpi warn"><span class="kic kw" aria-hidden="true">${KIC.x}</span><div class="l">需要人工確認</div><div class="n">${P.flags.length}<small>筆</small></div><div class="d">${P.flags.length?'匯入後請逐筆檢查':'沒有需要確認的'}</div></div>
@@ -1396,7 +1512,7 @@ async function confirmImport(){
   const oldImp=pick===0?cur2:[];
   const now=Date.now(), stamp=new Date().toLocaleString('zh-TW'), old=records.map(r=>Object.assign({},r));
   oldImp.forEach(r=>{ r.deleted=true; r.deletedAt=today(); });
-  P.recs.forEach((r,i)=>{ r.uid=newUid(); r.createdTs=now+i; r.createdAt=stamp; r.updatedAt=stamp; delete r.importedFrom; records.push(r); });
+  P.recs.forEach((r,i)=>{ r.uid=newUid(); r.createdTs=now+i; r.createdAt=stamp; r.updatedAt=stamp; delete r.importedFrom; records.push(migrate(r)); });
   if(!persist()){ records=old; return; }
   pendingImport=null; showHome(); flash(`已匯入 ${P.recs.length} 筆`);
 }
@@ -1404,6 +1520,23 @@ async function confirmImport(){
    聯絡清單：代碼、供應商、品項、公司電話、聯絡人、手機、檢驗報告
    聯絡人與手機屬於個資：安安確認只供自己使用、存在自己電腦裡可以放
    ========================================================= */
+/* ---------- 常用選項頁 ---------- */
+function showOpts(){
+  if(!leave()) return;
+  view='opts'; setSide('opts');
+  const used=new Set(records.filter(r=>!r.deleted).flatMap(r=>(r.tests||[]).map(t=>t.name)));
+  $('#app').innerHTML = `
+    ${headHTML('常用選項','COMMON OPTIONS','檢驗項目的下拉選單。選「其他（自己填）」存檔後，也會自動加進來。','常用選項','')}
+    <div class="card"><div class="phd"><b>檢驗項目</b><span class="muted small">共 ${OPTS.tests.length} 項</span></div>
+      <div class="row" style="margin-bottom:10px"><input type="text" id="optNew" placeholder="例：二硫代胺基甲酸鹽" style="max-width:320px" onkeydown="if(event.key==='Enter')optAdd()"><button class="primary" onclick="optAdd()">新增</button></div>
+      <ul class="mini">${OPTS.tests.map((x,i)=>`<li><span>${esc(x)}${used.has(x)?' <span class="muted small">（使用中）</span>':''}</span><span><button onclick="optMove(${i},-1)" ${i?'':'disabled'}>↑</button> <button onclick="optMove(${i},1)" ${i<OPTS.tests.length-1?'':'disabled'}>↓</button> <button class="danger" onclick="optDel(${i})">刪除</button></span></li>`).join('')}</ul>
+      <div class="muted small" style="margin-top:8px">刪除選項不會改到已經存好的紀錄。常用選項只存在此裝置此瀏覽器，「下載備份」會一起備份。</div></div>
+    ${pageGuide('opts')}`;
+  window.scrollTo(0,0);
+}
+function optAdd(){ const el=$('#optNew'), v=el.value.trim(); if(!v) return; if(OPTS.tests.includes(v)){ alert('已經有這個選項了。'); return; } OPTS.tests.push(v); if(saveOpts()){ showOpts(); flash('已新增'); } }
+function optMove(i,d){ const a=OPTS.tests, j=i+d; if(j<0||j>=a.length) return; [a[i],a[j]]=[a[j],a[i]]; saveOpts(); showOpts(); }
+async function optDel(i){ const v=OPTS.tests[i]; if(!(await ask(`確定從常用選項移除「${v}」？（已經存好的紀錄不會改變）`))) return; OPTS.tests.splice(i,1); saveOpts(); showOpts(); }
 let contacts = loadContacts(), ctCur = null, ctSearch = '';
 function ctMigrate(c){ return Object.assign({uid:'', code:'', supplier:'', items:'', phone:'', contact:'', mobile:'', report:'', note:'', importKey:''}, c, {uid:c.uid||('c'+newUid().slice(1))}); }
 function loadContacts(){ try{ return (JSON.parse(localStorage.getItem(KEY_C))||[]).map(ctMigrate); }catch(e){ return []; } }
@@ -1526,7 +1659,7 @@ async function backup(){
     for(const o of (await fAll()).filter(o=>ids.has(o.id)))
       files.push({id:o.id, name:o.name, type:o.type, size:o.size, addedAt:o.addedAt, data:await blobToDataUrl(o.blob)});
   }catch(e){ if(!confirm('附件讀取失敗，要只備份文字紀錄（不含附件）嗎？')) return; files=[]; }
-  download(JSON.stringify({app:'casevoraCoaTracker', version:3, exportedAt:new Date().toISOString(), records:rs, files, contacts},null,1),
+  download(JSON.stringify({app:'casevoraCoaTracker', version:3, exportedAt:new Date().toISOString(), records:rs, files, contacts, opts:OPTS},null,1),
     `coa_backup_${today()}.json`, 'application/json');
 }
 function restore(input){
@@ -1555,6 +1688,7 @@ function restore(input){
       if(blobs.length) await fx('readwrite', st=>{ blobs.forEach(b=>st.put(b)); });
     }catch(e){ records=old; alert('還原附件失敗，資料沒有變動。瀏覽器的儲存空間可能不夠。'); return; }
     if(!persist()){ records=old; return; }
+    if(data.opts && Array.isArray(data.opts.tests)) addOptTests(data.opts.tests);
     if(Array.isArray(data.contacts)){ contacts=data.contacts.filter(c=>c&&typeof c==='object').map(ctMigrate); persistContacts(); }
     dirty=false; cur=null; flash('還原完成'); showHome();
   };
