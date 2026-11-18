@@ -586,8 +586,8 @@ const PAGE_GUIDE = {
       `<p>「聯絡人」「手機」${N(1)}是<b>個人資料</b>，只供自己使用。</p><p>截圖、寄送 Excel 或備份檔給別人之前，<b>先遮蔽或刪除這兩欄</b>。</p>`]
   ],
   opts: ()=>[
-    ['新增、排序、刪除', MK(C('', R(F('例：二硫代胺基甲酸鹽',1),B('新增','d')), R('鉛',B('↑','',2),B('刪除','r',3)))),
-      `<p>輸入名稱按「<b>新增</b>」${N(1)}；用 ↑↓${N(2)} 調整在下拉選單的順序；不要的按「<b>刪除</b>」${N(3)}。</p><p class="muted small">刪除選項不會改到已經存好的紀錄。</p>`],
+    ['新增、排序、刪除', MK(C('', R(F('例：二硫代胺基甲酸鹽',1),B('新增','d')), R('鉛','<span>'+B('↑','',2)+' '+B('編輯')+' '+B('刪除','r',3)+'</span>'))),
+      `<p>輸入名稱按「<b>新增</b>」${N(1)}；用 ↑↓${N(2)} 調整在下拉選單的順序；不要的按「<b>刪除</b>」${N(3)}。</p><p>按「<b>編輯</b>」可以改名稱；已經有紀錄在用時，可以選「一起改」把那些紀錄也改掉。</p><p class="muted small">刪除選項不會改到已經存好的紀錄。</p>`],
     ['自動加入', MK(C('', R(F('其他（自己填） ▾',1)), R(F('二硫代胺基甲酸鹽')), R('<span></span>',B('儲存','d',2)))),
       `<p>在檢驗項目選「<b>其他（自己填）</b>」${N(1)}打字，按「<b>儲存</b>」${N(2)}後，這個項目就會自動加進常用選項，下次直接選。</p>`]
   ],
@@ -1532,13 +1532,36 @@ function showOpts(){
     ${headHTML('常用選項','COMMON OPTIONS','檢驗項目的下拉選單。選「其他（自己填）」存檔後，也會自動加進來。','常用選項','')}
     <div class="card"><div class="phd"><b>檢驗項目</b><span class="muted small">共 ${OPTS.tests.length} 項</span></div>
       <div class="row" style="margin-bottom:10px"><input type="text" id="optNew" placeholder="例：二硫代胺基甲酸鹽" style="max-width:320px" onkeydown="if(event.key==='Enter')optAdd()"><button class="primary" onclick="optAdd()">新增</button></div>
-      <ul class="mini">${OPTS.tests.map((x,i)=>`<li><span>${esc(x)}${used.has(x)?' <span class="muted small">（使用中）</span>':''}</span><span><button onclick="optMove(${i},-1)" ${i?'':'disabled'}>↑</button> <button onclick="optMove(${i},1)" ${i<OPTS.tests.length-1?'':'disabled'}>↓</button> <button class="danger" onclick="optDel(${i})">刪除</button></span></li>`).join('')}</ul>
+      <ul class="mini">${OPTS.tests.map((x,i)=>`<li><span>${esc(x)}${used.has(x)?' <span class="muted small">（使用中）</span>':''}</span><span><button onclick="optMove(${i},-1)" ${i?'':'disabled'}>↑</button> <button onclick="optMove(${i},1)" ${i<OPTS.tests.length-1?'':'disabled'}>↓</button> <button onclick="optEdit(${i})">編輯</button> <button class="danger" onclick="optDel(${i})">刪除</button></span></li>`).join('')}</ul>
       <div class="muted small" style="margin-top:8px">刪除選項不會改到已經存好的紀錄。常用選項只存在此裝置此瀏覽器，「下載備份」會一起備份。</div></div>
     ${pageGuide('opts')}`;
   window.scrollTo(0,0);
 }
 function optAdd(){ const el=$('#optNew'), v=el.value.trim(); if(!v) return; if(OPTS.tests.includes(v)){ alert('已經有這個選項了。'); return; } OPTS.tests.push(v); if(saveOpts()){ showOpts(); flash('已新增'); } }
 function optMove(i,d){ const a=OPTS.tests, j=i+d; if(j<0||j>=a.length) return; [a[i],a[j]]=[a[j],a[i]]; saveOpts(); showOpts(); }
+/* 輸入框視窗：回傳輸入的文字，取消回傳 null */
+function promptBox(msg, val){
+  return new Promise(res=>{
+    const m=document.createElement('div'); m.className='modal';
+    m.innerHTML=`<div class="box" role="dialog" aria-modal="true"><div class="msg"></div><input type="text" id="pbIn"><div class="row" style="margin-top:12px"><button id="pbNo">取消</button><button class="primary" id="pbYes">確定</button></div></div>`;
+    m.querySelector('.msg').textContent=msg; const inp=m.querySelector('#pbIn'); inp.value=val||'';
+    const done=v=>{ m.remove(); res(v); };
+    m.querySelector('#pbYes').onclick=()=>done(inp.value.trim()); m.querySelector('#pbNo').onclick=()=>done(null);
+    inp.onkeydown=e=>{ if(e.key==='Enter') done(inp.value.trim()); if(e.key==='Escape') done(null); };
+    document.body.appendChild(m); inp.focus(); inp.select();
+  });
+}
+async function optEdit(i){
+  const old=OPTS.tests[i]; const v=await promptBox(`修改「${old}」`, old);
+  if(v==null || v===old) return; if(!v){ alert('名稱不能空白。'); return; }
+  if(OPTS.tests.includes(v)){ alert('已經有這個選項了。'); return; }
+  const hits=records.filter(r=>!r.deleted && (r.tests||[]).some(t=>t.name===old));
+  let also=false;
+  if(hits.length){ const pick=await choose(`有 ${hits.length} 筆紀錄的檢驗項目是「${old}」。\n要把這些紀錄也一起改成「${v}」嗎？\n\n（歷史報告保留原本的名稱，不會改）`, ['一起改','只改選項']); if(pick<0) return; also=pick===0; }
+  OPTS.tests[i]=v;
+  if(also){ hits.forEach(r=>{ r.tests.forEach(t=>{ if(t.name===old) t.name=v; }); syncTests(r); }); if(!persist()){ return; } }
+  saveOpts(); showOpts(); flash(also?`已修改，並更新 ${hits.length} 筆紀錄`:'已修改');
+}
 async function optDel(i){ const v=OPTS.tests[i]; if(!(await ask(`確定從常用選項移除「${v}」？（已經存好的紀錄不會改變）`))) return; OPTS.tests.splice(i,1); saveOpts(); showOpts(); }
 let contacts = loadContacts(), ctCur = null, ctSearch = '';
 function ctMigrate(c){ return Object.assign({uid:'', code:'', supplier:'', items:'', phone:'', contact:'', mobile:'', report:'', note:'', importKey:''}, c, {uid:c.uid||('c'+newUid().slice(1))}); }
