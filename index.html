@@ -199,6 +199,7 @@ td.ac button{padding:4px 10px;font-size:13px}
 .attv{max-width:900px!important;max-height:90vh;overflow:auto}
 .attv img{max-width:100%;border:1px solid var(--line);border-radius:6px;display:block;margin:6px 0}
 .atts{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.att{position:relative}.attx{position:absolute;top:2px;right:2px;width:24px;height:24px;padding:0;border-radius:50%;background:#fff;border:1px solid #e7b4ae;color:var(--bad);font-weight:800;line-height:20px;z-index:2;box-shadow:0 1px 3px rgba(0,0,0,.15)}.attx:hover{background:var(--bad);color:#fff}
 .att{width:130px;border:1px solid var(--line);border-radius:8px;padding:6px;background:#fbf8f1;font-size:12px}
 .att a.pv{display:flex;align-items:center;justify-content:center;height:100px;border-radius:6px;background:#f3ece0;overflow:hidden;text-decoration:none;font-size:40px}
 .att img{width:100%;height:100%;object-fit:cover}
@@ -788,9 +789,9 @@ function newReport(uid){
   cur=JSON.parse(JSON.stringify(r));
   if(cur.receivedDate || cur.files.length) cur.history.unshift(snapshot(cur));
   if(cur.docType==='cal') Object.assign(cur, {receivedDate:'', dueDate:''});
-  Object.assign(cur, {qc:'pending', files:[], docNo:'', importExpiry:'', importExpiryManual:false, note:''});
+  Object.assign(cur, {qc:'pending', docNo:'', importExpiry:'', importExpiryManual:false, note:''});
   cur.newReport=true; view='detail'; dirty=true; renderDetail(); window.scrollTo(0,0);
-  flash('舊報告已放進「歷史報告」，填好新報告後按「儲存」');
+  flash('舊報告已存進「歷史報告」；要換的附件按右上角 ✕，再貼上新的');
 }
 /* 清單上方的「📄 收到新報告」：選分類 → 廠商 → 原物料 */
 function pickNewReport(){
@@ -871,7 +872,7 @@ function renderDetail(){
       <span id="stBadge"></span><span class="spacer"></span>
       ${isNew||r.newReport?'':`<button class="primary" onclick="newReport('${r.uid}')">📄 收到新報告</button> <button class="danger" onclick="deleteRecord()">刪除此筆</button>`}
     </div>
-    ${r.newReport?`<div class="notice small" style="background:#fff4e0;color:#7a3d06">📄 <b>正在登錄新報告</b>：上一份報告已放進下方「歷史報告」。${r.docType==='cal'?'請填<b>新的收件日期</b>':'在下方表格，<b>只改這次有新報告的檢驗項目</b>的收件日期（沒更新的不用動）'}、按 <b>Ctrl＋V</b> 貼上報告、判定品質，再按「儲存」。不儲存就離開的話，什麼都不會改變。</div>`:''}
+    ${r.newReport?`<div class="notice small" style="background:#fff4e0;color:#7a3d06">📄 <b>正在登錄新報告</b>：上一份報告已放進下方「歷史報告」。${r.docType==='cal'?'請填<b>新的收件日期</b>':'在下方表格，<b>只改這次有新報告的檢驗項目</b>的收件日期（沒更新的不用動）'}；附件裡<b>要換掉的按縮圖右上角 ✕</b>，再按 <b>Ctrl＋V</b> 貼上新報告，判定品質後按「儲存」。不儲存就離開的話，什麼都不會改變。</div>`:''}
     <div class="card">
       <h2><span class="no">1</span>文件資料｜${t.name}</h2>
       <div class="grid">
@@ -938,8 +939,8 @@ async function renderAtts(){
     let pv='<span title="找不到檔案">⚠️</span>';
     if(o){ const u=URL.createObjectURL(o.blob); attUrls.push(u);
       pv=`<a class="pv" href="${u}" target="_blank" rel="noopener">${f.type.startsWith('image/')?`<img src="${u}" alt="">`:'📄'}</a>`; }
-    return `<div class="att">${pv}<span class="nm">${esc(f.name)}<br><span class="muted">${fmtSize(f.size)}</span></span>
-      <button class="danger" onclick="removeAtt('${f.id}')">移除</button></div>`;
+    const added=(f.addedAt||(o&&o.addedAt)||'').slice(0,10);
+    return `<div class="att"><button class="attx" title="移除這個附件" onclick="removeAtt('${f.id}')">✕</button>${pv}<span class="nm">${esc(f.name)}<br><span class="muted">${added?'上傳 '+fmtDate(added)+'・':''}${fmtSize(f.size)}</span></span></div>`;
   }).join('');
 }
 async function addFiles(input){
@@ -947,8 +948,8 @@ async function addFiles(input){
   for(const file of list){
     if(!(file.type.startsWith('image/')||file.type==='application/pdf')){ alert(`「${file.name}」不是圖片或 PDF，已略過。`); continue; }
     if(file.size>MAX_FILE){ alert(`「${file.name}」超過 20 MB，已略過。`); continue; }
-    const meta={id:'f'+newUid().slice(1), name:file.name, type:file.type, size:file.size};
-    try{ await fPut(Object.assign({blob:file, addedAt:new Date().toISOString()},meta)); }
+    const meta={id:'f'+newUid().slice(1), name:file.name, type:file.type, size:file.size, addedAt:new Date().toISOString()};
+    try{ await fPut(Object.assign({blob:file},meta)); }
     catch(e){ alert(`「${file.name}」存不進去，瀏覽器的儲存空間可能已滿。請先「下載備份」，再移除不需要的附件。`); continue; }
     cur.files.push(meta); dirty=true;
   }
@@ -979,8 +980,9 @@ async function viewAtts(uid, hid){
   m.addEventListener('click',e=>{ if(e.target===m) close(); }); m.querySelector('#attClose').onclick=close;
   document.body.appendChild(m);
 }
-function removeAtt(id){
-  if(!confirm('確定要移除這個附件嗎？（按「儲存」後才會生效）')) return;
+async function removeAtt(id){
+  const f=(cur.files||[]).find(x=>x.id===id);
+  if(!(await ask(`確定要移除「${f?f.name:'這個附件'}」嗎？\n按「儲存」後才會生效${cur.newReport?'；舊檔案在「歷史報告」裡還看得到':''}。`))) return;
   cur.files=cur.files.filter(f=>f.id!==id); dirty=true; refreshForm(); renderAtts();
 }
 
@@ -1076,7 +1078,6 @@ function onField(el){
   refreshForm();
 }
 function saveRecord(){
-  delete cur.newReport;
   const r=cur, t=TYPES[r.docType], miss=[];
   if(!r.supplier.trim()) miss.push(t.sup);
   if(!r.item.trim()) miss.push(t.item);
@@ -1098,11 +1099,14 @@ function saveRecord(){
   if(isNew){ r.uid=newUid(); r.createdAt=new Date().toLocaleString('zh-TW'); r.createdTs=Date.now(); }
   r.updatedAt=new Date().toLocaleString('zh-TW');
   const backupList=records.slice(), i=records.findIndex(x=>x.uid===r.uid), copy=JSON.parse(JSON.stringify(r));
+  delete copy.newReport;
   if(i>=0) records[i]=copy; else records.push(copy);
   if(!persist()){ records=backupList; if(isNew) r.uid=''; return; }
   dirty=false; cleanupFiles();
+  const wasNR=r.newReport; delete r.newReport;
   if(isNew){ showList(); flash('已儲存'); return; }
-  $('#savedAt').textContent='最後儲存：'+r.updatedAt; renderTests(); refreshForm(); flash('已儲存');
+  $('#savedAt').textContent='最後儲存：'+r.updatedAt; renderTests(); refreshForm(); flash(wasNR?'更新成功':'已儲存');
+  if(wasNR) renderDetail();
 }
 async function deleteRecord(){
   if(!(await ask('確定要刪除嗎？'))) return;
