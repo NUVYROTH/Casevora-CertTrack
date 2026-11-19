@@ -531,7 +531,7 @@ function panelsHTML(rs){
       ${att.length?`<ul class="mini">${att.map(r=>{ const s=statusOf(r); return `<li class="click" onclick="openFrom('${r.uid}')"><span>${esc(label(r))}<br><span class="muted small">${esc(TYPES[r.docType].name)}${r.docNo?'・'+esc(r.docNo):''}</span></span><span class="badge ${s.c}">${s.k==='late'?esc(s.extra):s.t}</span></li>`; }).join('')}</ul>`:'<div class="muted small">目前沒有需要處理的文件。</div>'}</div>`;
 }
 function openFrom(uid){ const r=records.find(x=>x.uid===uid); if(!r) return; if(!leave()) return; curType=r.docType; openRecord(uid); }
-function openGuide(){ const g=document.querySelector('#app details.mguide'); if(g){ g.open=true; g.scrollIntoView({behavior:'smooth',block:'start'}); } else showHelp(); }
+function openGuide(){ const g=document.querySelector('#app details.pg'); if(g){ g.open=true; g.scrollIntoView({behavior:'smooth',block:'start'}); } else showHelp(); }
 /* 各頁下方的使用說明（收合）：左邊迷你畫面、金色數字對應右邊文字；樣式比照衛生缺失工具 */
 const N=n=>`<span class="mkn">${n}</span>`;
 const B=(t,o='',n)=>`<span class="mkw">${n?N(n):''}<span class="mkb ${o}${n?' hl':''}">${t}</span></span>`;
@@ -543,39 +543,58 @@ const ST=(t,c)=>`<span class="mks ${c}">${t}</span>`;
 function docSteps(k){
   const t=TYPES[k], cal=k==='cal';
   return [
-    ['新增紀錄', MK(R('<span></span>',B(`＋ 新增${t.name}紀錄`,'d',1)), C('', cal
-        ? R('儀器名稱 *',F('磅秤 ▾',2))+R('校正公司 *',F('王小明校正行'))+R('校正範圍',F('0'),'～',F('30'),F('kg ▾',3))
-        : R('供應商名稱 *',F('王小明食品行',2))+R('原料或產品 *',F('麵粉'))+R('原料分類',F('調味料 ▾',3)))),
-      cal ? `<p>按右上角「＋ 新增${t.name}紀錄」${N(1)}，選<b>儀器名稱</b>${N(2)}（選「其他」可以自己打），填校正公司。</p><p class="muted small">校正範圍填「從～到」，單位${N(3)}依儀器自動帶出：磅秤 g／kg、溫度計 °C，溫濕度計有 °C 和 % 兩組。</p>`
-          : `<p>按右上角「＋ 新增${t.name}紀錄」${N(1)}，填<b>供應商名稱、原料或產品</b>${N(2)}（有 * 必填），選<b>原料分類</b>${N(3)}。</p><p class="muted small">還沒收到文件時，收件日期留空，狀態會顯示「缺件」，可以先建立當提醒。檢驗項目、檢驗表需求、提供方式、附件都是選填。附件可以直接按 <b>Ctrl＋V</b> 貼上截圖或 PDF。</p>`],
-    ['收到新報告（更新）', MK(R('<span></span>',B('📄 收到新報告','d',1)), C('', R('廠商',F('資川 ▾',2)), R(cal?'儀器':'原物料',F(cal?'磅秤 ▾':'黑胡椒粉 ▾',3))), C('歷史報告',R('2024/03/09','📎1','保存到 2029/03/09'))),
-      `<p>收到新的一份報告時，按清單上方「<b>📄 收到新報告</b>」${N(1)}，選${cal?'校正公司':'廠商'}${N(2)}、${cal?'儀器':'原物料'}${N(3)}，按「下一步」。</p><p>舊報告會<b>自動存進「歷史報告」</b>，從收件日起保留 5 年；你只要填新的收件日期、Ctrl＋V 貼上新報告、判定品質，再按儲存。</p><p class="muted small">已經打開那一筆時，也可以直接按右上角的「📄 收到新報告」。</p>`],
-    cal ? ['收到文件：填日期', MK(C('收件與更新日期', R('收件日期',F('2026/11/01',1)), R('更新週期',F('1 年 ▾',2)), R('到期日',F('2027/11/01',3))), C('', R('文件收件狀態',ST('已更新','s-ok')))),
-      `<p>填<b>收件日期</b>${N(1)}（不能晚於今天），選<b>更新週期</b>${N(2)}，<b>到期日</b>${N(3)}會自動算出來，也可以自己改。</p><p class="muted small">文件狀態由系統依日期自動判斷，不用自己選。</p>`]
-    : ['檢驗項目與日期', MK(C('檢驗項目與日期', R(F('鉛＋鎘 ▾',1),F('2026/05/29',2),F('1 年 ▾'),ST('已更新','s-ok')), R(F('農藥殘留 ▾'),F('2026/03/01'),F('1 年 ▾'),ST('需要更新','s-need'))), R(B('＋ 增加檢驗項目','',3),'')),
-      `<p>每一行是一個檢驗項目：從<b>常用選項</b>${N(1)}選（沒有的選「其他（自己填）」），填<b>收件日期</b>${N(2)}、選週期，<b>到期日自動算</b>。</p><p>同一個原物料有好幾份報告，就按「<b>＋ 增加檢驗項目</b>」${N(3)}多加幾行。整筆的狀態看<b>最急的那一行</b>。</p><p class="muted small">自己填的新項目，儲存後會加進左邊「⚙️ 常用選項」。</p>`],
-    ['品質確認，然後儲存', MK(C('品質確認', R('品質確認狀態',F('合格 ▾',1))), R(B('儲存','d',2),B('返回清單'),'<span style="color:#b45309">● 有尚未儲存的修改</span>')),
-      `<p>由品管判定<b>合格</b>或<b>不合格</b>${N(1)}（不合格會變成「需要更新」），最後按左下角「<b>儲存</b>」${N(2)}。</p><p class="muted small">還沒儲存就離開，會先問你一次。</p>`],
-    ['找到要處理的文件', MK(C('', R(N(1)+'<span>'+B('待辦','d')+' '+B('缺件')+' '+B('逾期')+' '+B('全部')+'</span>'), R(F(cal?'搜尋 儀器／校正公司':'搜尋 供應商／原料',2)), cal?'':R(F('全部原料分類 ▾',3)))),
-      `<p>用分頁${N(1)}切換<b>待辦、缺件、需要更新、尚未更新、不合格、已更新、全部</b>。</p><p>搜尋框${N(2)}可以找${cal?'<b>儀器、校正範圍、校正公司、編號</b>':'<b>供應商、原料、分類、編號</b>'}${cal?'':`；也可以依原料分類${N(3)}篩選`}。</p>`],
-    ['編輯、刪除', MK(C('', R(cal?'磅秤':'王小明食品行',ST('逾期 35 天','s-late'),'<span>'+B('編輯','',1)+' '+B('刪除','r',2)+'</span>'), R('<span>'+N(3)+'☑ 全選本頁</span>',B('刪除（20）','r')))),
-      `<p>每一列右邊的「<b>編輯</b>」${N(1)}可以打開修改，「<b>刪除</b>」${N(2)}會先問一次再刪。</p><p>要一次刪很多筆：勾「<b>全選本頁</b>」${N(3)}再按「刪除（N）」。刪掉的先進「最近刪除」，30 天內可以還原。</p><p class="muted small">有附件的紀錄會顯示「📎2」，點一下就能直接看附件。</p>`],
+    ['收到新報告（最常用）', MK(R('<span></span>',B('📄 收到新報告','d',1)), C('', cal?'':R('原料分類',F('全部分類 ▾')), R(cal?'校正公司':'廠商',F(cal?'王小明校正行 ▾':'資川 ▾',2)), R(cal?'儀器':'原物料',F(cal?'磅秤（上次收件 2025/11/01）▾':'黑胡椒粉（上次收件 2024/03/09）▾',3)))),
+      `<p>收到某個品項的新報告時，按右上角「<b>📄 收到新報告</b>」${N(1)}，選${cal?'校正公司':'廠商'}${N(2)}、${cal?'儀器':'原物料'}${N(3)}，按「下一步」就會打開那一筆。</p><p class="muted small">接下來怎麼填，看編輯頁最下面的「編輯紀錄使用說明」。</p>`],
+    ['新增紀錄（新的品項）', MK(R('<span></span>',B(`＋ 新增${t.name}紀錄`,'',1)), C('', cal
+        ? R('儀器名稱 *',F('磅秤 ▾',2))+R('校正公司 *',F('王小明校正行'))
+        : R('供應商名稱 *',F('王小明食品行',2))+R('原料或產品 *',F('麵粉'))+R('原料分類',F('調味料 ▾')))),
+      `<p>清單裡還沒有的品項，才按「<b>＋ 新增${t.name}紀錄</b>」${N(1)}，填${cal?'<b>儀器名稱、校正公司</b>':'<b>供應商名稱、原料或產品</b>'}${N(2)}，其他照編輯頁的說明填。</p><p class="muted small">還沒收到文件也可以先建立，收件日期留空會顯示「缺件」，當作提醒。</p>`],
+    ['找到要處理的文件', MK(C('', R(N(1)+'<span>'+B('待辦','d')+' '+B('缺件')+' '+B('已更新')+' '+B('全部')+'</span>'), R(F(cal?'搜尋 儀器／校正公司':'搜尋 供應商／原料',2)), cal?'':R(F('全部原料分類 ▾',3)))),
+      `<p>用分頁${N(1)}切換<b>待辦、缺件、需要更新、尚未更新、不合格、已更新、全部</b>。</p><p>搜尋框${N(2)}可以找${cal?'<b>儀器、校正範圍、校正公司、編號</b>':'<b>供應商、原料、分類、編號</b>'}${cal?'':`；也可以依原料分類${N(3)}篩選`}。${cal?'':'有好幾個檢驗項目的，原物料下面會寫「3 個檢驗項目」，到期日顯示最早的一個。'}</p>`],
+    ['看附件、編輯、刪除', MK(C('', R(cal?'磅秤':'王小明食品行',B('📎2','',1),ST('逾期 35 天','s-late')), R('<span>'+B('編輯','',2)+' '+B('刪除','r',3)+'</span>'), R('<span>☑ 全選本頁</span>',B('刪除（20）','r')))),
+      `<p>有附件的會顯示「<b>📎2</b>」${N(1)}，點一下直接看報告，不用進編輯頁。</p><p>「<b>編輯</b>」${N(2)}打開那一筆；「<b>刪除</b>」${N(3)}會先問一次。要一次刪很多筆，勾「全選本頁」再按「刪除（N）」。刪掉的先進「最近刪除」，30 天內可以還原。</p>`],
     ['匯出這一類', MK(R('<span></span>',B('匯出報表（Excel）','',1)), C('', R('只匯出目前清單',ST('依分頁與篩選','s-need')))),
-      `<p>「<b>匯出報表（Excel）</b>」${N(1)}只匯出<b>這一類、目前畫面上的清單</b>（會跟著分頁和篩選）。</p><p class="muted small">要全部三類一次匯出，請到「總覽」按「匯出全部（Excel）」。</p>`]
+      `<p>「<b>匯出報表（Excel）</b>」${N(1)}只匯出<b>這一類、目前畫面上的清單</b>（會跟著分頁和篩選）。</p><p class="muted small">要全部一次匯出，請到「總覽」按「匯出全部（Excel）」。</p>`]
   ];
+}
+/* 編輯頁的使用說明 */
+function detailSteps(cal){
+  const att=['附件：貼上、替換', MK(C('', R('<span class="mkb">📋 Ctrl＋V 貼上</span>')), R(`<span class="mkw"><span class="mkb">📄 農藥報告.pdf</span>${N(1)}<span class="mkb r">✕</span></span>`, '<span class="muted">上傳 2026/03/01</span>')),
+    `<p>按 <b>Ctrl＋V</b> 就能貼上截圖、圖片或 PDF（從檔案總管複製的檔案也行），也可以按「選擇檔案」。</p><p>每個縮圖下面有<b>上傳日期</b>；要拿掉的按右上角 <b>✕</b>${N(1)}，確認後按「儲存」才生效。點縮圖可以打開來看。</p>`];
+  const nr=['收到新報告', MK(R('<span></span>',B('📄 收到新報告','d',1)), C('', R(cal?'收件日期':'農藥殘留',F('2026/11/15',2)), R('<span class="mkb">📄 農藥報告.pdf <span style="color:#b42318">✕</span></span>',N(3)))),
+    `<p>收到新的一份報告時，按右上角「<b>📄 收到新報告</b>」${N(1)}：舊的整份會先存進「歷史報告」。</p><p>${cal?'填<b>新的收件日期</b>':'只改<b>這次有新報告的那一行</b>的收件日期'}${N(2)}，過期的附件按 ✕ 換掉${N(3)}、Ctrl＋V 貼上新的，判定品質後按「儲存」，看到「<b>更新成功</b>」就完成了。</p>`];
+  const hist=['歷史報告', MK(C('🗂 歷史報告（共 2 份）▸', R('2025/03/01',B('📎3','',1),'保存到 2030/03/01'))),
+    `<p>以前的報告都在最下面的「<b>🗂 歷史報告</b>」，平常是收起來的，點標題展開。點「📎」${N(1)}可以看當時的報告。</p><p class="muted small">從那份報告的收件日起保留 5 年，之後移到「最近刪除」放 30 天再刪除。</p>`];
+  const save=['儲存、刪除', MK(R(B('儲存','d',1),B('返回清單'),'<span style="color:#b45309">● 有尚未儲存的修改</span>'), R('<span></span>',B('刪除此筆','r',2))),
+    `<p>改完按左下角「<b>儲存</b>」${N(1)}。還沒儲存就離開，會先問你一次。</p><p>整筆不要了按右上角「<b>刪除此筆</b>」${N(2)}，會先進「最近刪除」，30 天內可以還原。</p>`];
+  if(cal) return [
+    ['儀器資料', MK(C('', R('儀器名稱 *',F('溫濕度計 ▾',1)), R('校正公司 *',F('王小明校正行')), R('校正範圍',F('0'),'～',F('50'),'°C',N(2)))),
+      `<p>選<b>儀器名稱</b>${N(1)}（選「其他」可以自己打），填校正公司。</p><p>校正範圍填「從～到」，單位${N(2)}依儀器自動帶出：磅秤 g／kg、溫度計 °C，溫濕度計有 °C 和 % 兩組。</p>`],
+    ['收件日期與狀態', MK(C('', R('收件日期',F('2026/11/01',1)), R('更新週期',F('1 年 ▾')), R('到期日',F('2027/11/01',2)), R('品質確認',F('合格 ▾',3)))),
+      `<p>填<b>收件日期</b>${N(1)}、選週期，<b>到期日</b>${N(2)}自動算，也可以自己改。由品管判定<b>合格／不合格</b>${N(3)}，不合格會變「需要更新」。</p>`],
+    att, nr, hist, save];
+  return [
+    ['文件資料', MK(C('', R('供應商名稱 *',F('高峰農場')), R('原料或產品 *',F('乾香菇')), R('原料分類',F('蔬菜＋副原料 ▾',1)), R('報告提供方式',F('報告書隨貨附 ▾',2)))),
+      `<p>供應商、原料是必填。<b>原料分類</b>${N(1)}方便清單篩選；<b>報告提供方式</b>${N(2)}記錄報告怎麼來的（隨貨附、紙本、電子檔…）。</p><p class="muted small">檢驗表需求寫你們要求廠商提供的項目。</p>`],
+    ['檢驗項目與日期', MK(C('', R(F('鉛＋鎘 ▾',1),ST('已更新','s-ok')), R('收件',F('2026/05/29',2),'1 年')), C('', R(F('農藥殘留 ▾'),ST('逾期','s-late')), R('收件',F('2025/09/01'),'1 年')), R(B('＋ 增加檢驗項目','',3),'')),
+      `<p>每一行是一個檢驗項目：從<b>常用選項</b>${N(1)}選，沒有的選「其他（自己填）」，儲存後會加進常用選項。</p><p>填<b>收件日期</b>${N(2)}、選週期，<b>到期日自動算</b>；有好幾份報告就按「<b>＋ 增加檢驗項目</b>」${N(3)}。🗑 刪除一行。</p>`],
+    ['狀態與品質確認', MK(C('', R('文件收件狀態',ST('尚未更新','s-late')), R('',`<span class="muted">農藥殘留：逾期 78 天</span>`), R('品質確認狀態',F('合格 ▾',1)), R('進口效期',F('2027/02/24',2)))),
+      `<p>狀態由系統依日期判斷，<b>整筆看最急的那一行</b>。品管判定<b>合格／不合格</b>${N(1)}，不合格會變「需要更新」。</p><p class="muted small">有進口分析或輸入許可的，可以填效期${N(2)}，到期前 30 天提醒。</p>`],
+    att, nr, hist, save];
 }
 const PAGE_GUIDE = {
   home: ()=>[
     ['看今天要處理什麼', MK(`<div class="mkk">${[['待辦',5],['逾期',1],['30天內',1],['不合格',1]].map(([a,b])=>`<div>${a}<b>${b}</b></div>`).join('')}</div>`, C('需要注意', R('王小明食品行',ST('逾期 35 天','s-late'),N(1)), R('測試油品行',ST('缺件','s-miss')))),
       `<p>上面四張小卡：<b>待辦、已逾期、30 天內到期、品質不合格</b>，紅色數字就是要處理的。</p><p>右邊「需要注意」列出最急的 5 件，<b>點一下就打開</b>${N(1)}。</p>`],
     ['進入各類清單', MK(C('文件清單', R(N(1)+'📄 廠商COA報告','待辦 2'), R('🧪 原物料外檢報告','待辦 1'), R('⚖️ 儀器校正外檢報告','待辦 1'))),
-      `<p>點「文件清單」裡任何一類${N(1)}，或用左邊選單，就會進入那一類的清單。</p><p class="muted small">每一頁最下面都有那一頁的使用說明，點開就看得到。</p>`],
+      `<p>點「文件清單」裡任何一類${N(1)}，或用左邊選單，就會進入那一類的清單。</p><p class="muted small">每一頁（包括編輯紀錄頁）最下面都有那一頁的使用說明，點開就看得到。檢驗項目的下拉清單在左邊「⚙️ 常用選項」整理。</p>`],
     ['匯出、從 Excel 匯入', MK(R(B('匯出全部（Excel）','d',1),B('從 Excel 匯入','',2)), C('匯入預覽（還沒匯入）', R('預計匯入','133 筆'), R('需要人工確認','<span style="color:#b42318">5 筆</span>'))),
       `<p>「<b>匯出全部（Excel）</b>」${N(1)}：下載有顏色、可篩選的報表（摘要、總表、各類、聯絡清單）。</p><p>「<b>從 Excel 匯入</b>」${N(2)}：先出現<b>匯入預覽</b>，按「確認匯入」後可以選「<b>取代全部</b>」或「加在後面」。</p>`],
     ['備份（每兩週到一個月做一次）', MK(R(B('下載備份','',1),B('從備份還原','',2)), C('', R('☁️ 放到自己的雲端硬碟'), R('<span style="color:#b42318">⚠ 還原會取代目前資料</span>'))),
-      `<p>「<b>下載備份</b>」${N(1)}：存一份全部資料（含附件、聯絡清單），放到這台電腦以外的地方。</p><p>換電腦或資料不見時，用「<b>從備份還原</b>」${N(2)}，<b>會取代目前所有資料</b>。</p>`]
+      `<p>「<b>下載備份</b>」${N(1)}：存一份全部資料（含附件、歷史報告、聯絡清單、常用選項），放到這台電腦以外的地方。</p><p>換電腦或資料不見時，用「<b>從備份還原</b>」${N(2)}，<b>會取代目前所有資料</b>。</p>`]
   ],
   coa: ()=>docSteps('coa'), raw: ()=>docSteps('raw'), cal: ()=>docSteps('cal'),
+  detail: ()=>detailSteps(false), detailCal: ()=>detailSteps(true),
   contacts: ()=>[
     ['新增聯絡資料', MK(R('<span></span>',B('＋ 新增聯絡資料','d',1)), C('', R('供應商 *',F('王小明食品行',2)), R('品項',F('麵粉')), R('連絡電話',F('02-1234-5678')))),
       `<p>按「<b>＋ 新增聯絡資料</b>」${N(1)}，至少填<b>供應商</b>${N(2)}，其他像品項、連絡電話、聯絡人、手機、檢驗報告獲取方式都可以填。</p>`],
@@ -596,15 +615,15 @@ const PAGE_GUIDE = {
     ['救回刪錯的紀錄', MK(C('最近刪除', R('<span>☑ 測試油品行</span>','剩 28 天')), R(B('全選','',1),B('還原','',2))),
       `<p>勾選要救回的紀錄（或按「<b>全選</b>」${N(1)}），再按「<b>還原</b>」${N(2)}，就會回到原本的清單。</p>`],
     ['永久刪除', MK(C('', R('<span>☑ 假肉品公司</span>','剩 3 天')), R('<span></span>',B('永久刪除','r',1))),
-      `<p>確定不要的，勾選後按「<b>永久刪除</b>」${N(1)}，會再問一次；<b>永久刪除後無法復原</b>。</p><p class="muted small">保留超過 30 天的，會在下次打開工具時自動永久刪除。</p>`]
+      `<p>確定不要的，勾選後按「<b>永久刪除</b>」${N(1)}，會再問一次；<b>永久刪除後無法復原</b>。</p><p class="muted small">保留超過 30 天的，會在下次打開工具時自動永久刪除。</p><p class="muted small">歷史報告滿 5 年也會先移到這裡，標示「歷史報告（已滿 5 年）」，一樣可以還原。</p>`]
   ]
 };
-const GUIDE_TITLE={opts:'常用選項',home:'總覽',coa:'廠商COA報告',raw:'原物料外檢報告',cal:'儀器校正外檢報告',contacts:'聯絡清單',trash:'最近刪除'};
+const GUIDE_TITLE={detail:'編輯紀錄',detailCal:'編輯紀錄（儀器校正）',opts:'常用選項',home:'總覽',coa:'廠商COA報告',raw:'原物料外檢報告',cal:'儀器校正外檢報告',contacts:'聯絡清單',trash:'最近刪除'};
 function pageGuide(key, forceOpen){
   const steps=PAGE_GUIDE[key](); let open=!!forceOpen;
   if(!forceOpen){ try{ open=localStorage.getItem('casevoraCoaTracker_guide_'+key)==='1'; }catch(e){} }
   const step=(n,[t,mk,body])=>`<div class="mg-step"><div class="mg-pic">${mk}</div><div class="mg-txt"><div class="mg-h"><span class="no">${n}</span>${t}</div>${body}</div></div>`;
-  return `<details class="card mguide" ${open?'open':''} ${forceOpen?'':`ontoggle="try{localStorage.setItem('casevoraCoaTracker_guide_${key}',this.open?'1':'0')}catch(e){}"`}>
+  return `<details class="card mguide pg" ${open?'open':''} ${forceOpen?'':`ontoggle="try{localStorage.setItem('casevoraCoaTracker_guide_${key}',this.open?'1':'0')}catch(e){}"`}>
     <summary><b>📖 ${GUIDE_TITLE[key]}使用說明</b><span class="muted small">（點這裡收合／展開）</span></summary>
     <div class="mg-grid">${steps.map((x,i)=>step(i+1,x)).join('')}</div>
     ${key==='home'?`<div class="notice small" style="margin-top:12px;background:#fff4e0;color:#7a3d06"><b>注意：</b>本機儲存 · 僅在此裝置此瀏覽器有效。<b>請不要使用無痕視窗</b>；清除瀏覽資料時勾選「Cookie 和其他網站資料」會讓全部紀錄消失。請定期「下載備份」。</div>`:''}
@@ -822,13 +841,13 @@ function expireHistory(){
 function histHTML(r){
   const hs=(r.history||[]).filter(h=>!h.deleted);
   if(!hs.length) return '';
-  return `<div class="card"><h2><span class="no">${r.docType==='cal'?4:2}</span>歷史報告<span class="muted small" style="font-weight:400">（共 ${hs.length} 份，從收件日起保留 ${HIST_YEARS} 年）</span></h2>
+  return `<details class="card mguide hist"><summary><b>🗂 歷史報告</b><span class="muted small">（共 ${hs.length} 份，從收件日起保留 ${HIST_YEARS} 年；點這裡展開／收合）</span></summary><div style="margin-top:10px">
     <div style="overflow-x:auto"><table><thead><tr><th>收件日期</th><th>到期日</th><th>品質確認</th><th>檢驗項目</th><th>附件</th><th>保存到</th></tr></thead><tbody>
     ${hs.map(h=>`<tr><td class="nw">${fmtDate(h.receivedDate)||'—'}</td><td class="nw">${fmtDate(h.dueDate)||'—'}</td><td>${qcBadge(h)}</td>
       <td class="small">${(h.tests&&h.tests.length)?h.tests.map(t=>`${esc(t.name)||'—'}<span class="muted">（${fmtDate(t.receivedDate)||'未收'} → ${fmtDate(t.dueDate)||'—'}）</span>`).join('<br>'):(esc(h.testItems||'').replace(/\n/g,'<br>')||'—')}</td>
       <td>${(h.files||[]).length?`<button class="clipb" onclick="viewAtts('${r.uid}','${h.id}')">📎${h.files.length}</button>`:'—'}</td>
       <td class="nw small muted">${fmtDate(histKeep(h))}</td></tr>`).join('')}
-    </tbody></table></div></div>`;
+    </tbody></table></div></div></details>`;
 }
 function openRecord(id){
   if(id){ const r=records.find(x=>x.uid===id); if(!r||r.deleted) return; cur=JSON.parse(JSON.stringify(r)); }
@@ -920,6 +939,7 @@ function renderDetail(){
       </div>
     </div>`}
     ${histHTML(r)}
+    ${pageGuide(r.docType==='cal'?'detailCal':'detail')}
     <div class="savebar"><div class="in">
       <button class="primary" onclick="saveRecord()">儲存</button>
       <button onclick="showList()">返回清單</button>
