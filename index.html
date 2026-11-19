@@ -193,6 +193,32 @@ td.ac button{padding:4px 10px;font-size:13px}
 .range .u{font-weight:700;min-width:28px}
 .range + .range{margin-top:8px}
 .ttab td,.ttab th{vertical-align:middle}.ttab select,.ttab input{min-width:120px}.ttab td button{padding:4px 8px}
+.seg{display:inline-flex;gap:2px;background:#f3ece0;border:1px solid var(--line);border-radius:999px;padding:4px}
+.seg button{border:0;background:none;border-radius:999px;padding:6px 18px;font-weight:700;color:var(--muted)}
+.seg button.on,.seg button.on:hover{background:var(--brand);color:#fffdf8}
+.st-title{font-size:20px;font-weight:700;margin:0}
+.st-sum{border-radius:8px;padding:12px 14px;font-size:16px;font-weight:700;margin:8px 0 14px;line-height:1.5}
+.st-sum.ok{background:var(--ok-soft);color:#0f5a2d}.st-sum.warn{background:var(--warn-soft);color:#7a3d06}
+.st-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px}
+.st-tile{border:1px solid var(--line);border-radius:10px;padding:12px 10px;text-align:center;background:#fff}
+.st-tile.click{cursor:pointer}.st-tile.click:hover{border-color:var(--gold)}
+.st-tile .n{font-size:34px;font-weight:700;line-height:1.1}.st-tile .l{font-size:14px;font-weight:700;margin-top:4px}.st-tile .d{font-size:12px;color:var(--muted);margin-top:2px}
+.st-tile.t-done .n{color:var(--ok)}.st-tile.t-open .n{color:var(--info)}.st-tile.t-over .n{color:var(--bad)}.st-tile.t-over{border-color:#e7b4ae;background:var(--bad-soft)}
+.st-note{font-size:12px;color:var(--muted);margin:2px 0 10px}
+.st-sec{margin:18px 0 6px;font-size:16px;font-weight:700;border-left:4px solid var(--brand);padding-left:8px}
+.st-bar{display:grid;grid-template-columns:minmax(80px,170px) 1fr 44px;gap:8px;align-items:center;margin:4px 0;font-size:14px}
+.st-bar .b{background:#efe7d8;border-radius:4px;height:16px}.st-bar .b i{display:block;height:16px;background:var(--brand);border-radius:4px;min-width:2px}.st-bar .b i.r{background:var(--bad)}
+.st-bar .v{text-align:right;font-weight:700}
+.st-chart svg{width:100%;min-width:560px;height:auto;display:block}.st-scroll{overflow-x:auto}
+.st-leg{display:flex;gap:16px;font-size:13px;margin:4px 0}
+.st-leg span::before{content:"";display:inline-block;width:22px;height:0;border-top:3px solid;vertical-align:middle;margin-right:6px}
+.st-leg .a::before{border-color:var(--brand)}.st-leg .c::before{border-color:var(--bad);border-top-style:dashed}
+.tchg{margin-top:4px;font-size:12px;color:var(--muted)}.chg{font-size:12px;font-weight:700;white-space:nowrap}.chg-bad{color:var(--bad)}.chg-good{color:var(--ok)}.chg-eq{color:var(--muted);font-weight:600}
+.donut{display:flex;justify-content:center}.dleg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--muted);margin-top:6px}.dleg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.hb{display:grid;grid-template-columns:minmax(70px,140px) 1fr 30px;gap:8px;align-items:center;font-size:13px;margin:7px 0}.hb .b{height:12px;background:#efe6d5;border-radius:4px}.hb .b i{display:block;height:12px;border-radius:0 4px 4px 0;background:var(--brand);min-width:3px}.hb .v{text-align:right;font-weight:700}
+.modal .box.glist{max-width:760px}.gwrap{max-height:60vh;overflow:auto}.gwrap th,.gwrap td{white-space:nowrap}.gwrap tr.click{cursor:pointer}.gwrap tr.click:hover td{background:var(--brand-soft)}
+@media (max-width:640px){ .st-tiles{grid-template-columns:repeat(2,1fr)} .st-tile .n{font-size:30px} }
+@media print{ .snav,header.topbar,.savebar,.ptools,details.pg,.alert,.lbadge,.dlbtn,.seg,.st-pick{display:none!important} body{padding-left:0!important;background:#fff} .appg{display:block} main{padding:0} .card{box-shadow:none;break-inside:avoid} }
 .pastebox{margin-top:6px;border:2px dashed var(--field);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--muted);background:#fbf8f1}
 .clipb{border:1px solid var(--gold);background:#fbf6ec;border-radius:999px;padding:0 7px;font-size:12px;line-height:18px;cursor:pointer}
 .clipb:hover{background:#f3ece0}
@@ -251,6 +277,7 @@ td.ac button{padding:4px 10px;font-size:13px}
     <button data-v="coa" onclick="showList('coa')"><span class="ic">📄</span>廠商COA報告</button>
     <button data-v="raw" onclick="showList('raw')"><span class="ic">🧪</span>原物料外檢報告</button>
     <button data-v="cal" onclick="showList('cal')"><span class="ic">⚖️</span>儀器校正外檢報告</button>
+    <button data-v="stats" onclick="showStats()"><span class="ic">📊</span>統計分析</button>
     <button data-v="contacts" onclick="showContacts()"><span class="ic">📇</span>聯絡清單</button>
     <button data-v="opts" onclick="showOpts()"><span class="ic">⚙️</span>常用選項</button>
     <button data-v="trash" onclick="showTrash()"><span class="ic">🗑️</span>最近刪除</button>
@@ -587,7 +614,7 @@ const PAGE_GUIDE = {
     ['看今天要處理什麼', MK(`<div class="mkk">${[['待辦',5],['逾期',1],['30天內',1],['不合格',1]].map(([a,b])=>`<div>${a}<b>${b}</b></div>`).join('')}</div>`, C('需要注意', R('王小明食品行',ST('逾期 35 天','s-late'),N(1)), R('測試油品行',ST('缺件','s-miss')))),
       `<p>上面四張小卡：<b>待辦、已逾期、30 天內到期、品質不合格</b>，紅色數字就是要處理的。</p><p>右邊「需要注意」列出最急的 5 件，<b>點一下就打開</b>${N(1)}。</p>`],
     ['進入各類清單', MK(C('文件清單', R(N(1)+'📄 廠商COA報告','待辦 2'), R('🧪 原物料外檢報告','待辦 1'), R('⚖️ 儀器校正外檢報告','待辦 1'))),
-      `<p>點「文件清單」裡任何一類${N(1)}，或用左邊選單，就會進入那一類的清單。</p><p class="muted small">每一頁（包括編輯紀錄頁）最下面都有那一頁的使用說明，點開就看得到。檢驗項目的下拉清單在左邊「⚙️ 常用選項」整理。</p>`],
+      `<p>點「文件清單」裡任何一類${N(1)}，或用左邊選單，就會進入那一類的清單。</p><p class="muted small">每一頁（包括編輯紀錄頁）最下面都有那一頁的使用說明，點開就看得到。檢驗項目的下拉清單在左邊「⚙️ 常用選項」整理；要看月報、季報、年報，點左邊「📊 統計分析」。</p>`],
     ['匯出、從 Excel 匯入', MK(R(B('匯出全部（Excel）','d',1),B('從 Excel 匯入','',2)), C('匯入預覽（還沒匯入）', R('預計匯入','133 筆'), R('需要人工確認','<span style="color:#b42318">5 筆</span>'))),
       `<p>「<b>匯出全部（Excel）</b>」${N(1)}：下載有顏色、可篩選的報表（摘要、總表、各類、聯絡清單）。</p><p>「<b>從 Excel 匯入</b>」${N(2)}：先出現<b>匯入預覽</b>，按「確認匯入」後可以選「<b>取代全部</b>」或「加在後面」。</p>`],
     ['備份（每兩週到一個月做一次）', MK(R(B('下載備份','',1),B('從備份還原','',2)), C('', R('☁️ 放到自己的雲端硬碟'), R('<span style="color:#b42318">⚠ 還原會取代目前資料</span>'))),
@@ -605,6 +632,18 @@ const PAGE_GUIDE = {
     ['個資提醒', MK(C('', R('聯絡人',F('業務 王小明')), R('手機',F('0912-***-***',1)))),
       `<p>「聯絡人」「手機」${N(1)}是<b>個人資料</b>，只供自己使用。</p><p>截圖、寄送 Excel 或備份檔給別人之前，<b>先遮蔽或刪除這兩欄</b>。</p>`]
   ],
+  stats: ()=>[
+    ['選期間', MK(R(N(1)+'<span>'+B('年度')+' '+B('每季')+' '+B('每月','d')+'</span>'), R(F('2026 年 ▾',2),F('11 月 ▾'),F('全部文件 ▾',3))),
+      `<p>先選「<b>年度／每季／每月</b>」${N(1)}，再選年份、月份${N(2)}；也可以只看某一類文件${N(3)}。下面的數字、表格、圖表都會跟著換。</p>`],
+    ['看四個數字、點開明細', MK(`<div class="mkk"><div>收到<b>12</b></div><div>如期<b style="color:#167a3e">8</b></div><div>待更新<b style="color:#1d4f91">3</b></div><div>逾期<b style="color:#b42318">1</b>${N(1)}</div></div>`),
+      `<p><b>收到報告</b>：本期收件的檢驗項目。<b>本期到期</b>＝如期更新＋待更新＋逾期未更新。</p><p>點任一格${N(1)}會列出是哪些，點一列就能直接打開那筆紀錄處理。</p>`],
+    ['逾期明細、廠商排行、分類統計', MK(C('', R('資川',`<span class="mkf" style="background:#b42318;max-width:70px">&nbsp;</span>`,'5'), R('振芳',`<span class="mkf" style="background:#b42318;max-width:30px">&nbsp;</span>`,'2')), C('', R('水產','12','逾期 2'))),
+      `<p>「<b>逾期明細</b>」列出目前所有已過期還沒換報告的檢驗項目；「<b>哪家廠商逾期最多</b>」方便決定先催誰。</p><p>「<b>原料分類統計</b>」看每一類目前已更新、需要更新、逾期、缺件各幾項。</p>`],
+    ['未來到期預測、趨勢圖', MK(C('未來 12 個月到期', R('2026/12',`<span class="mkf" style="background:#16213a;max-width:60px">&nbsp;</span>`,'6'), R('2027/1',`<span class="mkf" style="background:#16213a;max-width:24px">&nbsp;</span>`,'2')), R(B('⬇ 下載圖片','',1),B('列印／存成 PDF','',2))),
+      `<p>「<b>未來 12 個月到期預測</b>」看哪個月要到期的最多，提早催報告。趨勢圖畫出收到報告和逾期的變化，「⬇ 下載圖片」${N(1)}存成 PNG。</p><p>右上「<b>列印／存成 PDF</b>」${N(2)}可以印出整頁給主管看。</p>`],
+    ['▲▼ 跟上期比、右側圖表', MK(C('', R('收到報告','12',`<b style="color:#167a3e">▲ +20%</b>`), R('逾期未更新','1',`<b style="color:#b42318">▲ 新增</b>`)), C('目前狀態', R('已更新 60%','需要更新','逾期'))),
+      `<p>數字旁邊的 ▲▼ 是跟上期比：<b style="color:#b42318">紅色＝變差</b>、<b style="color:#167a3e">綠色＝變好</b>。本期還沒過完時，上期只算到同一天。</p><p>右側有目前狀態圓餅、檢驗項目前 5 名、廠商前 5 名。</p>`]
+  ],
   opts: ()=>[
     ['新增、編輯、排序、刪除', MK(C('', R(F('例：二硫代胺基甲酸鹽',1),B('新增','d')), R('鉛','<span>'+B('↑','',2)+' '+B('編輯')+' '+B('刪除','r',3)+'</span>'))),
       `<p>輸入名稱按「<b>新增</b>」${N(1)}；用 ↑↓${N(2)} 調整在下拉選單的順序；不要的按「<b>刪除</b>」${N(3)}。</p><p>按「<b>編輯</b>」可以改名稱；已經有紀錄在用時，可以選「一起改」把那些紀錄也改掉。</p><p class="muted small">刪除選項不會改到已經存好的紀錄。</p>`],
@@ -618,7 +657,7 @@ const PAGE_GUIDE = {
       `<p>確定不要的，勾選後按「<b>永久刪除</b>」${N(1)}，會再問一次；<b>永久刪除後無法復原</b>。</p><p class="muted small">保留超過 30 天的，會在下次打開工具時自動永久刪除。</p><p class="muted small">歷史報告被刪除時也會先移到這裡：在編輯頁按 🗑 的標示「<b>手動刪除</b>」，保存滿 5 年的標示「<b>已滿 5 年</b>」，一樣可以還原。</p>`]
   ]
 };
-const GUIDE_TITLE={detail:'編輯紀錄',detailCal:'編輯紀錄（儀器校正）',opts:'常用選項',home:'總覽',coa:'廠商COA報告',raw:'原物料外檢報告',cal:'儀器校正外檢報告',contacts:'聯絡清單',trash:'最近刪除'};
+const GUIDE_TITLE={stats:'統計分析',detail:'編輯紀錄',detailCal:'編輯紀錄（儀器校正）',opts:'常用選項',home:'總覽',coa:'廠商COA報告',raw:'原物料外檢報告',cal:'儀器校正外檢報告',contacts:'聯絡清單',trash:'最近刪除'};
 function pageGuide(key, forceOpen){
   const steps=PAGE_GUIDE[key](); let open=!!forceOpen;
   if(!forceOpen){ try{ open=localStorage.getItem('casevoraCoaTracker_guide_'+key)==='1'; }catch(e){} }
@@ -1571,6 +1610,197 @@ async function confirmImport(){
    聯絡清單：代碼、供應商、品項、公司電話、聯絡人、手機、檢驗報告
    聯絡人與手機屬於個資：安安確認只供自己使用、存在自己電腦裡可以放
    ========================================================= */
+
+/* =========================================================
+   統計分析（比照衛生缺失工具：年度／每季／每月、跟上期比、點數字看明細）
+   統計單位＝「檢驗項目」：一筆紀錄有 3 個檢驗項目就算 3 個；儀器校正一筆算 1 個
+   ========================================================= */
+let statView='month', statY=null, statM=null, statQ=null, statType='';
+const lastDay=(y,m)=>new Date(y,m,0).getDate();
+function stInit(){ if(statY===null){ const t=today(); statY=+t.slice(0,4); statM=+t.slice(5,7); statQ=Math.ceil(statM/3); } }
+const stA=()=>statView==='month'?statM:statView==='quarter'?statQ:0;
+function periodRange(view,y,a){
+  if(view==='month') return {start:`${y}-${p2(a)}-01`, end:`${y}-${p2(a)}-${p2(lastDay(y,a))}`, label:`${y} 年 ${a} 月`, short:`${a}月`, y, a};
+  if(view==='quarter'){ const m1=(a-1)*3+1, m3=a*3; return {start:`${y}-${p2(m1)}-01`, end:`${y}-${p2(m3)}-${p2(lastDay(y,m3))}`, label:`${y} 年第 ${a} 季（${m1}～${m3} 月）`, short:`${y} Q${a}`, y, a}; }
+  return {start:`${y}-01-01`, end:`${y}-12-31`, label:`${y} 年`, short:`${y}`, y, a:0};
+}
+function shiftPeriod(view,y,a,k){
+  if(view==='month'){ const t=y*12+(a-1)+k; return {y:Math.floor(t/12), a:t%12+1}; }
+  if(view==='quarter'){ const t=y*4+(a-1)+k; return {y:Math.floor(t/4), a:t%4+1}; }
+  return {y:y+k, a:0};
+}
+/* 上期：本期還沒過完時，上期只算到「同一天」，才不會拿半個月比整個月 */
+function prevRangeSame(view,y,a){
+  const rg=periodRange(view,y,a), pv=shiftPeriod(view,y,a,-1), pr=periodRange(view,pv.y,pv.a), t=today();
+  if(t>=rg.start && t<rg.end){ const e=addDays(pr.start, daysBetween(rg.start,t)); if(e<pr.end){ pr.end=e; pr.same=true; } }
+  return pr;
+}
+function pctTxt(n,pn){ if(pn==null) return ''; if(n===pn) return '＝ 持平'; if(!pn) return '▲ 新增'; const p=Math.round(Math.abs(n-pn)/pn*100); return (n>pn?'▲ +':'▼ −')+(p||'<1')+'%'; }
+function chgHTML(n,pn,good){ if(pn==null) return ''; const cls=n===pn?'chg-eq':((n>pn)!==!!good?'chg-bad':'chg-good'); return `<span class="chg ${cls}" title="上期 ${pn} → 本期 ${n}">${pctTxt(n,pn)}</span>`; }
+/* 目前的檢驗項目（每行一筆）與歷史報告裡的檢驗項目 */
+function stRows(type){
+  const cur=[], hist=[];
+  live().forEach(r=>{ if(type && r.docType!==type) return;
+    const one=(t,arr,h)=>arr.push({r, name:t.name||'（未填）', recv:t.receivedDate||'', due:t.dueDate||'', period:t.period, h});
+    if(r.docType==='cal' || !(r.tests||[]).length) cur.push({r, name:r.docType==='cal'?itemLabel(r):(r.testItems||'（未填）'), recv:r.receivedDate||'', due:r.dueDate||'', period:r.period});
+    else r.tests.forEach(t=>one(t,cur));
+    (r.history||[]).filter(h=>!h.deleted).forEach(h=>{
+      if((h.tests||[]).length) h.tests.forEach(t=>one(t,hist,h));
+      else hist.push({r, name:r.docType==='cal'?itemLabel(r):(h.testItems||'（未填）'), recv:h.receivedDate||'', due:h.dueDate||'', period:h.period, h});
+    });
+  });
+  return {cur, hist};
+}
+const rowSt = x => baseStatus(Object.assign(testRec(x.r,{receivedDate:x.recv,dueDate:x.due,period:x.period}),{qc:x.r.qc}));
+function statCompute(rg, type){
+  const t=today(), nx=addDays(rg.end,1), asOf=nx<t?nx:t, inP=d=>d && d>=rg.start && d<=rg.end;
+  const {cur,hist}=stRows(type), seen=new Set(), uniq=(arr,key)=>arr.filter(x=>{ const k=key(x); if(seen.has(k)) return false; seen.add(k); return true; });
+  const recv=uniq(cur.concat(hist).filter(x=>inP(x.recv)), x=>'r|'+x.r.uid+'|'+x.name+'|'+x.recv);
+  const dueAll=uniq(cur.concat(hist).filter(x=>x.recv && inP(x.due)), x=>'d|'+x.r.uid+'|'+x.name+'|'+x.due);
+  const g={done:[], open:[], over:[]};
+  dueAll.forEach(x=>{ const c=cur.find(y=>y.r===x.r && y.name===x.name);
+    if(c && c.due===x.due){ (x.due<asOf?g.over:g.open).push(c); } else g.done.push(c||x); });
+  const fail=live().filter(r=>(!type||r.docType===type) && r.qc==='fail' && inP(r.receivedDate));
+  const late=cur.filter(x=>x.recv && x.due && x.due<asOf).sort((a,b)=>a.due<b.due?-1:1);
+  const missing=cur.filter(x=>!x.recv);
+  const bySup=new Map(); late.forEach(x=>bySup.set(x.r.supplier||'（未填）',(bySup.get(x.r.supplier||'（未填）')||0)+1));
+  return {rg, asOf, recv, dueAll, ...g, fail, late, missing, supList:[...bySup.entries()].sort((a,b)=>b[1]-a[1]), lists:{recv, due:dueAll, ...g}};
+}
+function statSeries(view,y,a,type){
+  const N=view==='month'?12:view==='quarter'?4:5, out=[];
+  for(let i=-(N-1);i<=0;i++){ const q=shiftPeriod(view,y,a,i), rg=periodRange(view,q.y,q.a), c=statCompute(rg,type); out.push({label:rg.short, y:q.y, a:q.a, total:c.recv.length, over:c.over.length}); }
+  return out;
+}
+function lineChart(ser,view){
+  if(!ser.some(p=>p.total>0||p.over>0)) return '<div class="empty" style="padding:20px">尚無資料</div>';
+  const W=640,H=268,L=38,R=18,T=26,B=64, iw=W-L-R, ih=H-T-B;
+  const mx=Math.max(...ser.map(p=>Math.max(p.total,p.over)),1), step=Math.max(1,Math.ceil(mx/4)), top=step*4;
+  const X=i=>L+(ser.length===1?iw/2:iw*i/(ser.length-1)), Y=v=>T+ih-ih*v/top;
+  let g='';
+  for(let k=0;k<=4;k++){ const v=k*step; g+=`<line x1="${L}" x2="${W-R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e3d9c6"/><text x="${L-6}" y="${Y(v)+4}" font-size="11" text-anchor="end" fill="#5d6779">${v}</text>`; }
+  const pts=k=>ser.map((p,i)=>`${X(i)},${Y(p[k])}`).join(' ');
+  g+=`<polyline points="${pts('total')}" fill="none" stroke="#16213a" stroke-width="3"/><polyline points="${pts('over')}" fill="none" stroke="#c0392b" stroke-width="3" stroke-dasharray="7 4"/>`;
+  ser.forEach((p,i)=>{
+    g+=`<circle cx="${X(i)}" cy="${Y(p.total)}" r="4" fill="#16213a"/><circle cx="${X(i)}" cy="${Y(p.over)}" r="4" fill="#c0392b"/>`;
+    if(p.total>0) g+=`<text x="${X(i)}" y="${Y(p.total)-9}" font-size="13" font-weight="700" text-anchor="middle" fill="#16213a">${p.total}</text>`;
+    if(p.over>0 && p.over!==p.total) g+=`<text x="${X(i)}" y="${Y(p.over)+19}" font-size="13" font-weight="700" text-anchor="middle" fill="#c0392b">${p.over}</text>`;
+    g+=`<text x="${X(i)}" y="${H-B+18}" font-size="12" text-anchor="middle" fill="#16213a">${esc(view==='month'?p.a+'月':p.label)}</text>`;
+    if(view==='month' && (i===0||p.a===1)) g+=`<text x="${X(i)}" y="${H-B+34}" font-size="11" text-anchor="middle" fill="#5d6779">${p.y}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="趨勢折線圖">${g}</svg>`;
+}
+function stTable(rows){
+  return `<div class="st-scroll"><table><thead><tr><th>類別</th><th>廠商／校正公司</th><th>原物料／儀器</th><th>檢驗項目</th><th>收件日期</th><th>到期日</th><th>狀態</th></tr></thead><tbody>
+    ${rows.map(x=>{ const s=rowSt(x); return `<tr class="click" onclick="openFrom('${x.r.uid}')"><td class="small">${esc(TYPES[x.r.docType].name)}</td><td>${esc(x.r.supplier)}</td><td>${esc(itemLabel(x.r))}</td><td>${esc(x.name)}</td><td class="nw">${fmtDate(x.recv)||'—'}</td><td class="nw">${fmtDate(x.due)||'—'}</td><td><span class="badge ${s.c}">${s.t}</span>${s.extra?`<span class="st-sub">${esc(s.extra)}</span>`:''}</td></tr>`; }).join('')}
+  </tbody></table></div>`;
+}
+function statHTML(){
+  const rg=periodRange(statView,statY,stA()), c=statCompute(rg,statType), pr=prevRangeSame(statView,statY,stA()), pc=statCompute(pr,statType);
+  const pw0=statView==='month'?'上月':statView==='quarter'?'上季':'去年', pw=pr.same?pw0+'同期':pw0, tw=statView==='month'?`${statM} 月`:statView==='quarter'?`第 ${statQ} 季`:`${statY} 年`;
+  const tchg=(n,pn,good)=>`<div class="tchg">${chgHTML(n,pn,good)} 比${esc(pw)}（${pn}）</div>`;
+  const tile=(k,cls,n,l,d,pn,good)=>`<div class="st-tile ${cls} click" role="button" tabindex="0" title="點開看是哪些" onclick="showTileList('${k}')" onkeydown="if(event.key==='Enter')this.click()"><div class="n">${n}</div><div class="l">${l}</div><div class="d">${d}</div>${tchg(n,pn,good)}</div>`;
+  const bad=c.over.length+c.late.length>0;
+  const sum=`${tw}收到 ${c.recv.length} 份報告（檢驗項目，比${pw} ${pctTxt(c.recv.length,pc.recv.length)}）；本期到期 ${c.dueAll.length} 項，已如期更新 ${c.done.length} 項、逾期未更新 ${c.over.length} 項。目前全部累計逾期 ${c.late.length} 項、缺件 ${c.missing.length} 項。`;
+  const mxS=c.supList.length?c.supList[0][1]:1;
+  /* 原料分類統計（目前狀態） */
+  const {cur}=stRows(statType), cats=new Map();
+  cur.forEach(x=>{ const k=x.r.docType==='cal'?'儀器校正':(x.r.category||'未分類'); if(!cats.has(k)) cats.set(k,{n:0,ok:0,need:0,late:0,missing:0}); const o=cats.get(k), st=rowSt(x).k; o.n++; o[st]=(o[st]||0)+1; });
+  /* 未來 12 個月到期 */
+  const fut=[]; for(let i=0;i<12;i++){ const q=shiftPeriod('month',+today().slice(0,4),+today().slice(5,7),i), r2=periodRange('month',q.y,q.a); fut.push({lb:`${q.y}/${q.a}`, n:cur.filter(x=>x.recv&&x.due&&x.due>=r2.start&&x.due<=r2.end).length}); }
+  const mxF=Math.max(1,...fut.map(f=>f.n)), ser=statSeries(statView,statY,stA(),statType), trendName=statView==='month'?'最近 12 個月':statView==='quarter'?'最近 4 季':'最近 5 年';
+  return `
+    <div class="st-sum ${bad?'warn':'ok'}">${esc(sum)}</div>
+    <div class="st-tiles">
+      ${tile('recv','',c.recv.length,'收到報告','收件日期在本期',pc.recv.length,true)}
+      ${tile('done','t-done',c.done.length,'如期更新','本期到期、已換新報告',pc.done.length,true)}
+      ${tile('open','t-open',c.open.length,'待更新','本期到期、還沒到期日',pc.open.length)}
+      ${tile('over','t-over',c.over.length,'逾期未更新','本期到期、已過期還沒換',pc.over.length)}
+    </div>
+    <div class="st-note">本期到期 ＝ 如期更新 ＋ 待更新 ＋ 逾期未更新（${c.done.length} ＋ ${c.open.length} ＋ ${c.over.length} ＝ ${c.dueAll.length}）。單位是「檢驗項目」，一筆紀錄有 3 個檢驗項目就算 3 個（最上面四張小卡是以「筆」計算，所以數字會不一樣）。</div>
+    <div class="st-note">▲▼ 百分比＝跟${esc(pw)}（${fmtDate(pr.start)}～${fmtDate(pr.end)}）比：<b style="color:var(--bad)">紅色＝變差</b>、<b style="color:var(--ok)">綠色＝變好</b>。${c.fail.length?`本期收件判定<b style="color:var(--bad)">不合格 ${c.fail.length} 筆</b>。`:''}</div>
+    <div class="st-sec">逾期明細（目前累計 ${c.late.length} 項，需追蹤）</div>
+    ${c.late.length?stTable(c.late):'<div class="muted small">目前沒有逾期的檢驗項目。</div>'}
+    <div class="st-sec">哪家廠商逾期最多</div>
+    ${c.supList.length?c.supList.slice(0,10).map(([n,v])=>`<div class="st-bar"><div>${esc(n)}</div><div class="b"><i class="r" style="width:${Math.round(v/mxS*100)}%"></i></div><div class="v">${v}</div></div>`).join(''):'<div class="muted small">尚無資料</div>'}
+    <div class="st-sec">原料分類統計（目前狀態）</div>
+    ${cats.size?`<div class="st-scroll"><table><thead><tr><th>分類</th><th>檢驗項目</th><th>已更新</th><th>需要更新</th><th>尚未更新（逾期）</th><th>缺件</th></tr></thead><tbody>
+      ${[...cats.entries()].sort((a,b)=>b[1].n-a[1].n).map(([k,o])=>`<tr><td>${esc(k)}</td><td><b>${o.n}</b></td><td>${o.ok||0}</td><td>${o.need?`<b style="color:#5b3a9c">${o.need}</b>`:0}</td><td>${o.late?`<b style="color:var(--bad)">${o.late}</b>`:0}</td><td>${o.missing?`<b style="color:#7a3d06">${o.missing}</b>`:0}</td></tr>`).join('')}</tbody></table></div>`:'<div class="muted small">尚無資料</div>'}
+    <div class="st-sec">未來 12 個月到期預測（提早準備催報告）</div>
+    ${fut.map(f=>`<div class="st-bar"><div>${f.lb}</div><div class="b"><i style="width:${Math.round(f.n/mxF*100)}%"></i></div><div class="v">${f.n}</div></div>`).join('')}
+    <div class="st-sec">趨勢（${trendName}）</div>
+    <figure class="chartfig" style="margin:0" data-title="報告追蹤趨勢（${esc(trendName)}）">
+      <div class="st-leg"><span class="a">收到報告</span><span class="c">逾期未更新</span></div>
+      <div class="st-chart st-scroll">${lineChart(ser,statView)}</div>
+      ${ser.some(p=>p.total>0||p.over>0)?'<div class="row dlbtn" style="margin-top:6px"><button onclick="dlChart(this)">⬇ 下載圖片</button><span class="small muted"></span></div>':''}
+    </figure>`;
+}
+function donutHTML(){
+  const {cur}=stRows(statType), L=[['ok','已更新','#167a3e'],['need','需要更新','#7c5cc4'],['late','尚未更新','#b42318'],['missing','缺件','#d08a2c']];
+  const v=L.map(([k])=>cur.filter(x=>rowSt(x).k===k).length), tot=v.reduce((a,b)=>a+b,0);
+  if(!tot) return '<div class="muted small">還沒有資料。</div>';
+  const S=170, rr=S/2-14, C=2*Math.PI*rr; let off=0;
+  const arcs=v.map((n,i)=>{ if(!n) return ''; const len=C*n/tot, a=`<circle cx="${S/2}" cy="${S/2}" r="${rr}" fill="none" stroke="${L[i][2]}" stroke-width="22" stroke-dasharray="${Math.max(len-(n<tot?2:0),0)} ${C}" stroke-dashoffset="${-off}" transform="rotate(-90 ${S/2} ${S/2})"><title>${L[i][1]} ${n}</title></circle>`; off+=len; return a; }).join('');
+  return `<div class="donut"><svg viewBox="0 0 ${S} ${S}" width="${S}" height="${S}" role="img" aria-label="目前狀態分布">${arcs}<text x="50%" y="48%" text-anchor="middle" font-size="26" font-weight="800" fill="#16213a">${Math.round(v[0]/tot*100)}%</text><text x="50%" y="62%" text-anchor="middle" font-size="12" fill="#5d6779">已更新</text></svg></div>
+    <div class="dleg">${L.map((x,i)=>`<span><i style="background:${x[2]}"></i>${x[1]} ${v[i]}</span>`).join('')}</div>`;
+}
+function hbarHTML(rows){ if(!rows.length) return '<div class="muted small">還沒有資料。</div>'; const mx=Math.max(1,...rows.map(r=>r[1])); return rows.map(([t,n])=>`<div class="hb"><span>${esc(t)}</span><span class="b"><i style="width:${Math.round(n/mx*100)}%"></i></span><span class="v">${n}</span></div>`).join(''); }
+function statSideHTML(){
+  const {cur}=stRows(statType), cnt=(f)=>{ const m=new Map(); cur.forEach(x=>{ const k=f(x); m.set(k,(m.get(k)||0)+1); }); return [...m.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5); };
+  return `<div class="card"><div class="phd"><b>目前狀態</b><span class="muted small">全部檢驗項目</span></div>${donutHTML()}</div>
+    <div class="card"><div class="phd"><b>檢驗項目 前 5 名</b><span class="muted small">項目數</span></div>${hbarHTML(cnt(x=>x.name))}</div>
+    <div class="card"><div class="phd"><b>廠商 前 5 名</b><span class="muted small">檢驗項目數</span></div>${hbarHTML(cnt(x=>x.r.supplier||'（未填）'))}</div>`;
+}
+function setStat(k,v){ if(k==='view') statView=v; else if(k==='y') statY=+v; else if(k==='m') statM=+v; else if(k==='q') statQ=+v; else if(k==='t') statType=v; renderStats(); }
+function showStats(){ if(!leave()) return; view='stats'; setSide('stats'); stInit(); renderStats(); window.scrollTo(0,0); }
+function renderStats(){
+  stInit();
+  const cy=+today().slice(0,4), ys=live().map(r=>+(r.receivedDate||'').slice(0,4)).filter(Boolean), y0=Math.min(cy-1,...ys);
+  const yOpts=[]; for(let y=y0;y<=cy+1;y++) yOpts.push(y);
+  const vt=(k,n)=>`<button class="${statView===k?'on':''}" onclick="setStat('view','${k}')">${n}</button>`;
+  const rg=periodRange(statView,statY,stA());
+  $('#app').innerHTML = `
+    ${headHTML('統計分析','STATISTICS','報告收件、到期與逾期，依月／季／年統計。','統計分析','<button class="lite" onclick="window.print()">列印／存成 PDF</button>')}
+    ${kpiHTML(statType?ofType(statType):live())}
+    <div class="dgrid">
+      <div class="card">
+        <div class="phd"><b>統計報表</b></div>
+        <div class="seg" style="margin-bottom:10px">${vt('year','年度')}${vt('quarter','每季')}${vt('month','每月')}</div>
+        <div class="row st-pick" style="margin-bottom:6px">
+          <select style="width:auto" onchange="setStat('y',this.value)">${yOpts.map(y=>`<option value="${y}" ${y===statY?'selected':''}>${y} 年</option>`).join('')}</select>
+          ${statView==='month'?`<select style="width:auto" onchange="setStat('m',this.value)">${[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}" ${m===statM?'selected':''}>${m} 月</option>`).join('')}</select>`:''}
+          ${statView==='quarter'?`<select style="width:auto" onchange="setStat('q',this.value)">${[1,2,3,4].map(q=>`<option value="${q}" ${q===statQ?'selected':''}>第 ${q} 季</option>`).join('')}</select>`:''}
+          <select style="width:auto" onchange="setStat('t',this.value)"><option value="">全部文件</option>${Object.entries(TYPES).map(([k,t])=>`<option value="${k}" ${statType===k?'selected':''}>${t.name}</option>`).join('')}</select>
+        </div>
+        <h3 class="st-title" style="margin:6px 0">${esc(rg.label)}${statType?'｜'+esc(TYPES[statType].name):''}</h3>
+        ${statHTML()}
+      </div>
+      <div class="rcol">${statSideHTML()}</div>
+    </div>
+    ${pageGuide('stats')}`;
+}
+function showTileList(k){
+  const rg=periodRange(statView,statY,stA()), c=statCompute(rg,statType), rs=c.lists[k]||[];
+  const m=document.createElement('div'); m.className='modal';
+  m.innerHTML=`<div class="box glist" role="dialog" aria-modal="true"><div class="msg"><b>${{recv:'收到報告',done:'如期更新',open:'待更新',over:'逾期未更新'}[k]}</b>　<span class="muted small">${esc(rg.label)} ${rs.length} 項，點一列可打開</span></div>
+    <div class="gwrap">${rs.length?stTable(rs):'<div class="muted small">沒有資料</div>'}</div><div class="row" style="margin-top:12px"><button class="primary" id="gClose">關閉</button></div></div>`;
+  document.body.appendChild(m);
+  m.querySelector('#gClose').onclick=()=>m.remove(); m.onclick=e=>{ if(e.target===m) m.remove(); };
+  m.querySelectorAll('tr.click').forEach(tr=>tr.addEventListener('click',()=>m.remove()));
+}
+async function dlChart(btn){
+  const fig=btn.closest('figure'), msg=btn.nextElementSibling, sv=fig.querySelector('svg[role=img]'); if(!sv) return;
+  btn.disabled=true; msg.textContent='產生中…';
+  try{
+    const vb=sv.viewBox.baseVal, W=vb.width, H=vb.height, tH=36, lH=30, title=fig.dataset.title||'';
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W+24}" height="${H+tH+lH}" font-family="Microsoft JhengHei,PingFang TC,Noto Sans TC,sans-serif"><rect width="100%" height="100%" fill="#fff"/><text x="14" y="25" font-size="15" font-weight="700" fill="#16213a">${esc(title)}</text><g transform="translate(12,${tH})">${sv.innerHTML}</g>`
+      +`<line x1="20" y1="${H+tH+16}" x2="46" y2="${H+tH+16}" stroke="#16213a" stroke-width="3"/><text x="52" y="${H+tH+20}" font-size="13" fill="#16213a">收到報告</text><line x1="150" y1="${H+tH+16}" x2="176" y2="${H+tH+16}" stroke="#c0392b" stroke-width="3" stroke-dasharray="7 4"/><text x="182" y="${H+tH+20}" font-size="13" fill="#16213a">逾期未更新</text></svg>`;
+    const img=new Image(); img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg); await img.decode();
+    const k=2, c=document.createElement('canvas'); c.width=(W+24)*k; c.height=(H+tH+lH)*k; const g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height); g.drawImage(img,0,0,c.width,c.height);
+    const b=await new Promise((ok,no)=>c.toBlob(x=>x?ok(x):no(),'image/png')); download(b,`Casevoras_COA_trend_${today()}.png`); msg.textContent='已送出下載';
+  }catch(e){ msg.textContent='下載失敗，請重試'; }
+  btn.disabled=false; setTimeout(()=>{ msg.textContent=''; },3000);
+}
+
 /* ---------- 常用選項頁 ---------- */
 function showOpts(){
   if(!leave()) return;
