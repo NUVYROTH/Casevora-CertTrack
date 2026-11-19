@@ -563,8 +563,8 @@ function detailSteps(cal){
     `<p>按 <b>Ctrl＋V</b> 就能貼上截圖、圖片或 PDF（從檔案總管複製的檔案也行），也可以按「選擇檔案」。</p><p>每個縮圖下面有<b>上傳日期</b>；要拿掉的按右上角 <b>✕</b>${N(1)}，確認後按「儲存」才生效。點縮圖可以打開來看。</p>`];
   const nr=['收到新報告', MK(R('<span></span>',B('📄 收到新報告','d',1)), C('', R(cal?'收件日期':'農藥殘留',F('2026/11/15',2)), R('<span class="mkb">📄 農藥報告.pdf <span style="color:#b42318">✕</span></span>',N(3)))),
     `<p>收到新的一份報告時，按右上角「<b>📄 收到新報告</b>」${N(1)}：舊的整份會先存進「歷史報告」。</p><p>${cal?'填<b>新的收件日期</b>':'只改<b>這次有新報告的那一行</b>的收件日期'}${N(2)}，過期的附件按 ✕ 換掉${N(3)}、Ctrl＋V 貼上新的，判定品質後按「儲存」，看到「<b>更新成功</b>」就完成了。</p>`];
-  const hist=['歷史報告', MK(C('🗂 歷史報告（共 2 份）▸', R('2025/03/01',B('📎3','',1),'保存到 2030/03/01'))),
-    `<p>以前的報告都在最下面的「<b>🗂 歷史報告</b>」，平常是收起來的，點標題展開。點「📎」${N(1)}可以看當時的報告。</p><p class="muted small">從那份報告的收件日起保留 5 年，之後移到「最近刪除」放 30 天再刪除。</p>`];
+  const hist=['歷史報告', MK(C('🕘 歷史報告（共 2 份）▸', R('2025/03/01',B('📎3','',1)), R('保存到 2030/03/01','<span>'+B('↩ 換回這份')+' '+B('🗑','r')+'</span>'))),
+    `<p>以前的報告都在最下面的「<b>🕘 歷史報告</b>」，平常是收起來的，點標題展開。點「📎」${N(1)}可以看當時的報告。</p><p>按錯「收到新報告」或換錯檔案：在那份按「<b>↩ 換回這份</b>」，目前的內容會先存成歷史，不會弄丟；不要的按 <b>🗑</b>。兩個都要按「儲存」才生效。</p><p class="muted small">從那份報告的收件日起保留 5 年，之後移到「最近刪除」放 30 天再刪除。</p>`];
   const save=['儲存、刪除', MK(R(B('儲存','d',1),B('返回清單'),'<span style="color:#b45309">● 有尚未儲存的修改</span>'), R('<span></span>',B('刪除此筆','r',2))),
     `<p>改完按左下角「<b>儲存</b>」${N(1)}。還沒儲存就離開，會先問你一次。</p><p>整筆不要了按右上角「<b>刪除此筆</b>」${N(2)}，會先進「最近刪除」，30 天內可以還原。</p>`];
   if(cal) return [
@@ -841,13 +841,37 @@ function expireHistory(){
 function histHTML(r){
   const hs=(r.history||[]).filter(h=>!h.deleted);
   if(!hs.length) return '';
-  return `<details class="card mguide hist"><summary><b>🗂 歷史報告</b><span class="muted small">（共 ${hs.length} 份，從收件日起保留 ${HIST_YEARS} 年；點這裡展開／收合）</span></summary><div style="margin-top:10px">
-    <div style="overflow-x:auto"><table><thead><tr><th>收件日期</th><th>到期日</th><th>品質確認</th><th>檢驗項目</th><th>附件</th><th>保存到</th></tr></thead><tbody>
+  return `<details class="card mguide hist"><summary><b>🕘 歷史報告</b><span class="muted small">（共 ${hs.length} 份，從收件日起保留 ${HIST_YEARS} 年；點這裡展開／收合）</span></summary><div style="margin-top:10px">
+    <div style="overflow-x:auto"><table><thead><tr><th>收件日期</th><th>到期日</th><th>品質確認</th><th>檢驗項目</th><th>附件</th><th>保存到</th><th></th></tr></thead><tbody>
     ${hs.map(h=>`<tr><td class="nw">${fmtDate(h.receivedDate)||'—'}</td><td class="nw">${fmtDate(h.dueDate)||'—'}</td><td>${qcBadge(h)}</td>
       <td class="small">${(h.tests&&h.tests.length)?h.tests.map(t=>`${esc(t.name)||'—'}<span class="muted">（${fmtDate(t.receivedDate)||'未收'} → ${fmtDate(t.dueDate)||'—'}）</span>`).join('<br>'):(esc(h.testItems||'').replace(/\n/g,'<br>')||'—')}</td>
       <td>${(h.files||[]).length?`<button class="clipb" onclick="viewAtts('${r.uid}','${h.id}')">📎${h.files.length}</button>`:'—'}</td>
-      <td class="nw small muted">${fmtDate(histKeep(h))}</td></tr>`).join('')}
+      <td class="nw small muted">${fmtDate(histKeep(h))}</td>
+      <td class="ac">${view==='detail'&&cur?`<button onclick="histRestore('${h.id}')" title="把這份換回成目前的報告">↩ 換回這份</button> <button class="danger" onclick="histDelete('${h.id}')" title="刪除這份歷史報告">🗑</button>`:''}</td></tr>`).join('')}
     </tbody></table></div></div></details>`;
+}
+/* 歷史報告：換回、刪除（都要按「儲存」才生效） */
+const HIST_FIELDS=['receivedDate','dueDate','period','qc','docNo','testItems','testReq','provide','importExpiry','note','rFrom','rTo','rUnit','r2From','r2To','files','tests'];
+async function histRestore(id){
+  const h=(cur.history||[]).find(x=>x.id===id); if(!h) return;
+  if(!(await ask(`把 ${fmtDate(h.receivedDate)||'這份'} 的歷史報告換回成「目前的報告」嗎？\n\n目前的內容會先存成一份歷史報告，不會弄丟；換錯了可以再換回來。\n按「儲存」後才會生效。`))) return;
+  const now=snapshot(cur);
+  cur.history=cur.history.filter(x=>x.id!==id);
+  HIST_FIELDS.forEach(k=>{ if(h[k]!==undefined) cur[k]=JSON.parse(JSON.stringify(h[k])); });
+  if(cur.docType!=='cal' && !(cur.tests||[]).length){
+    const lines=String(cur.testItems||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    cur.tests=(lines.length?lines:['']).map(name=>({id:'t'+newUid().slice(1), name, receivedDate:cur.receivedDate, period:cur.period, dueDate:cur.dueDate}));
+  }
+  cur.history.unshift(now); delete cur.newReport;
+  dirty=true; renderDetail(); flash('已換回，確認沒問題後按「儲存」');
+  const hd=document.querySelector('details.hist'); if(hd) hd.open=true;
+}
+async function histDelete(id){
+  const h=(cur.history||[]).find(x=>x.id===id); if(!h) return;
+  if(!(await ask(`確定要刪除 ${fmtDate(h.receivedDate)||'這份'} 的歷史報告嗎？\n會先移到「最近刪除」，30 天內可以還原。\n按「儲存」後才會生效。`))) return;
+  h.deleted=true; h.deletedAt=today(); h.delByUser=true; dirty=true; renderDetail();
+  const hd=document.querySelector('details.hist'); if(hd) hd.open=true;
+  flash('已標記刪除，按「儲存」後生效');
 }
 function openRecord(id){
   if(id){ const r=records.find(x=>x.uid===id); if(!r||r.deleted) return; cur=JSON.parse(JSON.stringify(r)); }
@@ -987,7 +1011,7 @@ document.addEventListener('paste', e=>{
 });
 /* 清單上點 📎：直接看附件，不用進編輯頁 */
 async function viewAtts(uid, hid){
-  const r=records.find(x=>x.uid===uid); if(!r) return;
+  const r=(view==='detail'&&cur&&cur.uid===uid)?cur:records.find(x=>x.uid===uid); if(!r) return;
   const h=hid?(r.history||[]).find(x=>x.id===hid):null, fl=h?h.files:r.files;
   const items=await Promise.all((fl||[]).map(async f=>{ let o=null; try{ o=await fGet(f.id); }catch(e){} return {f,o}; }));
   const urls=[], m=document.createElement('div'); m.className='modal';
@@ -1141,7 +1165,7 @@ window.addEventListener('beforeunload', e=>{ if(dirty){ e.preventDefault(); e.re
    最近刪除
    ========================================================= */
 function trashList(){
-  const hs=[]; records.forEach(r=>(r.history||[]).forEach(h=>{ if(h.deleted) hs.push({uid:'h:'+r.uid+':'+h.id, hist:true, docType:r.docType, docNo:h.docNo, supplier:r.supplier, item:r.item, itemOther:r.itemOther, deletedAt:h.deletedAt, createdTs:0, recv:h.receivedDate}); }));
+  const hs=[]; records.forEach(r=>(r.history||[]).forEach(h=>{ if(h.deleted) hs.push({uid:'h:'+r.uid+':'+h.id, hist:true, docType:r.docType, docNo:h.docNo, supplier:r.supplier, item:r.item, itemOther:r.itemOther, deletedAt:h.deletedAt, createdTs:0, recv:h.receivedDate, byUser:h.delByUser}); }));
   return records.filter(r=>r.deleted).concat(hs).sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||'')||(b.createdTs||0)-(a.createdTs||0)); }
 function daysLeft(r){ return 30-daysBetween(r.deletedAt||today(),today()); }
 let trashBack='';
@@ -1165,7 +1189,7 @@ function renderTrash(){
       </div>
       ${rs.length?`<div style="overflow-x:auto"><table><thead><tr><th></th><th>文件類型</th><th>編號</th><th>刪除日期</th><th>供應商／校正公司</th><th>原料／產品／儀器</th><th>保留</th></tr></thead><tbody>
         ${rs.map(r=>`<tr><td><input type="checkbox" data-id="${esc(r.uid)}" ${trashSel.has(r.uid)?'checked':''} onchange="trashToggle(this)"></td>
-          <td class="small">${r.hist?`歷史報告（收件 ${fmtDate(r.recv)||'—'}，已滿 ${HIST_YEARS} 年）<br>`:''}${esc(TYPES[r.docType].name)}</td><td>${esc(r.docNo)||'—'}</td><td>${fmtDate(r.deletedAt)}</td><td>${esc(r.supplier)}</td><td>${esc(itemLabel(r))}</td><td class="small muted">剩 ${Math.max(daysLeft(r),0)} 天</td></tr>`).join('')}
+          <td class="small">${r.hist?`歷史報告（收件 ${fmtDate(r.recv)||'—'}，${r.byUser?'手動刪除':`已滿 ${HIST_YEARS} 年`}）<br>`:''}${esc(TYPES[r.docType].name)}</td><td>${esc(r.docNo)||'—'}</td><td>${fmtDate(r.deletedAt)}</td><td>${esc(r.supplier)}</td><td>${esc(itemLabel(r))}</td><td class="small muted">剩 ${Math.max(daysLeft(r),0)} 天</td></tr>`).join('')}
       </tbody></table></div>`:'<div class="empty">目前沒有刪除的紀錄</div>'}
     </div>
     ${pageGuide('trash')}`;
@@ -1178,7 +1202,7 @@ function trashRestore(){
   const ids=[...trashSel], done=[];
   records.forEach(r=>{ if(ids.includes(r.uid)&&r.deleted){ r.deleted=false; delete r.deletedAt; done.push(r); } });
   /* 還原的歷史報告：保存期限已過，會在下次打開時再移回來，所以改成從今天起再保留 30 天 */
-  records.forEach(r=>(r.history||[]).forEach(h=>{ if(h.deleted && ids.includes('h:'+r.uid+':'+h.id)){ h.deleted=false; delete h.deletedAt; h.keepUntil=addDays(today(),30); done.push(h); } }));
+  records.forEach(r=>(r.history||[]).forEach(h=>{ if(h.deleted && ids.includes('h:'+r.uid+':'+h.id)){ h.deleted=false; delete h.deletedAt; if(!h.delByUser) h.keepUntil=addDays(today(),30); delete h.delByUser; done.push(h); } }));
   if(!persist()){ done.forEach(r=>{ r.deleted=true; r.deletedAt=today(); }); return; }
   trashSel=new Set(); renderTrash(); flash('已還原 '+done.length+' 筆');
 }
